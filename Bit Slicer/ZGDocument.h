@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 10/25/09.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,28 +32,21 @@
 
 #import <Cocoa/Cocoa.h>
 
-@class ZGProcessTaskManager;
-@class ZGDebuggerController;
-@class ZGBreakPointController;
-@class ZGMemoryViewerController;
-@class ZGHotKeyCenter;
-@class ZGLoggerWindowController;
+@class ZGDocumentWindowController;
 @class ZGDocumentData;
 @class ZGSearchData;
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface ZGDocument : NSDocument
 
-@property (nonatomic) ZGProcessTaskManager *processTaskManager;
-@property (nonatomic) ZGDebuggerController *debuggerController;
-@property (nonatomic) ZGBreakPointController *breakPointController;
-@property (nonatomic) ZGHotKeyCenter *hotKeyCenter;
-@property (nonatomic) ZGLoggerWindowController *loggerWindowController;
+@property (nonatomic, copy) ZGDocumentWindowController * _Nonnull (^makeDocumentWindowController)(void);
 
-@property (nonatomic, copy) NSString *lastChosenInternalProcessName;
-
-@property (nonatomic) ZGDocumentData *data;
-@property (nonatomic) ZGSearchData *searchData;
+@property (nonatomic, readonly) ZGDocumentData *data;
+@property (nonatomic, readonly) ZGSearchData *searchData;
 
 - (void)markChange;
 
 @end
+
+NS_ASSUME_NONNULL_END

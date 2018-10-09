@@ -1,0 +1,35 @@
+/* Alert title for when target/process dies while watching accesses on a variable */
+"targetTeriminatedAlertTitleFormat" = "%@ Прерван";
+
+/* Alert message for when target/process dies while watching accesses on a variable, asking if user wants to add the found instructions */
+"targetTeriminatedAlertMessage" = "Хотите добавить найденные инструкции к этому документу?";
+
+/* Alert responce to adding the found instructions when the target process terminated */
+"targetTeriminatedAlertAddButton" = "Добавить";
+
+/* Annotated description annotated label for general purpose registers; not sure if this should be localized */
+"generalPurposeRegistersDescriptionLabel" = "Регистры общего назначения";
+
+/* Annotated description label for float/vector registers; not sure if this should be localized */
+"floatAndVectorRegistersDescriptionLabel" = "Float/Vector регистры";
+
+/* Optional meta-label for generalPurposeRegistersDescriptionLabel and floatAndVectorRegistersDescriptionLabel above */
+"firstRegisterAccessLabel" = "(первый доступ)";
+
+/* Notification title for when an instruction is found */
+"foundInstructionNotificationTitle" = "Найдены инструкции";
+
+/* Notification message for when an instruction is found */
+"foundInstructionNotificationMessageFormat" = "Найдены инструкции \"%@\"";
+
+/* Alert title for when a variable cannot be watched */
+"failedToWatchVariableAlertTitle" = "Не удалось Следить за пременной";
+
+/* Alert message for when a variable's accesses cannot be watched */
+"failedToWatchVariableAlertMessage" = "Точка наблюдения не может быть добавлена для этой переменной в данный момент.";
+
+/* Label for watching x-bit write accesses at an address */
+"watchWriteAccessesStatusFormat" = "Слежение %lld-бит запись в %@…";
+
+/* Label for watching x-bit read and write accesses at an address */
+"watchReadAndWriteAccessesStatusFormat" = "Слежение %lld-бит чтение и запись в %@…";

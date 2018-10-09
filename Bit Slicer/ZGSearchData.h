@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 7/21/12.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,45 +37,49 @@
 
 @class ZGStoredData;
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface ZGSearchData : NSObject
 {
 @public
 	// All for fast access, for comparison functions
-	
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wobjc-interface-ivars"
 	ZGMemorySize _dataSize;
-	void *_rangeValue;
+	void * _Nullable _rangeValue;
 	double _epsilon;
 	BOOL _shouldIgnoreStringCase;
 	
 	// For searching non-native byte order
-	void *_swappedValue;
+	void * _Nullable _swappedValue;
 	BOOL _bytesSwapped;
 	
 	// For linearly express stored values
-	void *_additiveConstant;
-	void *_multiplicativeConstant;
+	void * _Nullable _additiveConstant;
+	void * _Nullable _multiplicativeConstant;
 	
-	CollatorRef _collator; // For comparing unicode strings
-	unsigned char *_byteArrayFlags; // For wildcard byte array searches
+	CollatorRef _Nullable _collator; // For comparing unicode strings
+	unsigned char * _Nullable _byteArrayFlags; // For wildcard byte array searches
+#pragma clang diagnostic pop
 }
 
-typedef enum
+typedef NS_ENUM(NSInteger, ZGProtectionMode)
 {
 	ZGProtectionAll,
 	ZGProtectionWrite,
 	ZGProtectionExecute
-} ZGProtectionMode;
+};
 
-@property (nonatomic) void *searchValue;
+@property (nonatomic, nullable) void *searchValue;
 @property (nonatomic) ZGMemorySize dataSize;
 @property (nonatomic) ZGMemorySize dataAlignment;
 @property (nonatomic) ZGMemorySize pointerSize;
 
-@property (nonatomic) void *swappedValue;
+@property (nonatomic, nullable) void *swappedValue;
 @property (nonatomic) BOOL bytesSwapped;
 
-@property (nonatomic) void *rangeValue;
-@property (nonatomic) ZGStoredData *savedData;
+@property (nonatomic, nullable) void *rangeValue;
+@property (nonatomic, nullable) ZGStoredData *savedData;
 @property (nonatomic) BOOL shouldCompareStoredValues;
 @property (nonatomic) double epsilon;
 @property (nonatomic) BOOL shouldIgnoreStringCase;
@@ -85,14 +87,15 @@ typedef enum
 @property (nonatomic) ZGMemoryAddress beginAddress;
 @property (nonatomic) ZGMemoryAddress endAddress;
 @property (nonatomic) ZGProtectionMode protectionMode;
-@property (nonatomic) void *additiveConstant;
-@property (nonatomic) void *multiplicativeConstant;
-@property (nonatomic) unsigned char *byteArrayFlags;
+@property (nonatomic, nullable) void *additiveConstant;
+@property (nonatomic, nullable) void *multiplicativeConstant;
+@property (nonatomic, nullable) unsigned char *byteArrayFlags;
 
 @property (nonatomic) ZGMemoryAddress maxPointerOffset;
 @property (nonatomic) uint16_t numberOfPointerLevels;
 @property (nonatomic) NSArray *machBinariesInfo;
-
-- (id)initWithSearchValue:(void *)searchValue dataSize:(ZGMemorySize)dataSize dataAlignment:(ZGMemorySize)dataAlignment pointerSize:(ZGMemorySize)pointerSize;
+- (id)initWithSearchValue:(nullable void *)searchValue dataSize:(ZGMemorySize)dataSize dataAlignment:(ZGMemorySize)dataAlignment pointerSize:(ZGMemorySize)pointerSize;
 
 @end
+
+NS_ASSUME_NONNULL_END

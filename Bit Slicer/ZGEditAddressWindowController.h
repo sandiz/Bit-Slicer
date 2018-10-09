@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 11/29/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,6 +35,8 @@
 @class ZGVariable;
 @class ZGVariableController;
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface ZGEditAddressWindowController : NSWindowController
 
 - (id)initWithVariableController:(ZGVariableController *)variableController;
@@ -44,3 +44,5 @@
 - (void)requestEditingAddressFromVariable:(ZGVariable *)variable attachedToWindow:(NSWindow *)parentWindow;
 
 @end
+
+NS_ASSUME_NONNULL_END

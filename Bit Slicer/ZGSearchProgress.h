@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 3/7/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,14 +33,16 @@
 #import <Foundation/Foundation.h>
 #import "ZGMemoryTypes.h"
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface ZGSearchProgress : NSObject
 
-typedef enum
+typedef NS_ENUM(NSInteger, ZGSearchProgressType)
 {
 	ZGSearchProgressMemoryScanning,
 	ZGSearchProgressMemoryStoring,
 	ZGSearchProgressMemoryDumping
-} ZGSearchProgressType;
+};
 
 - (id)initWithProgressType:(ZGSearchProgressType)progressType maxProgress:(ZGMemorySize)maxProgress;
 
@@ -55,3 +55,5 @@ typedef enum
 @property (atomic) BOOL shouldCancelSearch;
 
 @end
+
+NS_ASSUME_NONNULL_END

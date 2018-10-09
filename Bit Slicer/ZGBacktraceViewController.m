@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 2/22/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,25 +31,21 @@
  */
 
 #import "ZGBacktraceViewController.h"
-#import "ZGNavigationPost.h"
 #import "ZGVirtualMemory.h"
 #import "ZGProcess.h"
 #import "ZGInstruction.h"
 #import "ZGVariable.h"
 #import "ZGMemoryViewerController.h"
 #import "ZGBacktrace.h"
-
-@interface ZGBacktraceViewController ()
-
-@property (nonatomic, weak) id <ZGBacktraceViewControllerDelegate> delegate;
-
-@property (nonatomic, assign) IBOutlet NSTableView *tableView;
-
-@property (assign, nonatomic) BOOL shouldIgnoreTableSelection;
-
-@end
+#import "NSArrayAdditions.h"
 
 @implementation ZGBacktraceViewController
+{
+	__weak id <ZGBacktraceViewControllerDelegate> _Nullable _delegate;
+	BOOL _shouldIgnoreTableSelection;
+	
+	IBOutlet NSTableView *_tableView;
+}
 
 #pragma mark Birth
 
@@ -60,7 +54,7 @@
 	self = [super initWithNibName:@"Backtrace View" bundle:nil];
 	if (self != nil)
 	{
-		self.delegate = delegate;
+		_delegate = delegate;
 	}
 	return self;
 }
@@ -69,16 +63,10 @@
 {
 	[super loadView];
 	
-	self.tableView.target = self;
-	self.tableView.doubleAction = @selector(changeInstructionSelection:);
+	_tableView.target = self;
+	_tableView.doubleAction = @selector(changeInstructionSelection:);
 	
-	if (floor(NSAppKitVersionNumber) <= NSAppKitVersionNumber10_9)
-	{
-		[self setNextResponder:[self.tableView nextResponder]];
-		[self.tableView setNextResponder:self];
-	}
-	
-	[self.tableView registerForDraggedTypes:@[ZGVariablePboardType]];
+	[_tableView registerForDraggedTypes:@[ZGVariablePboardType]];
 }
 
 #pragma mark Backtrace
@@ -87,20 +75,21 @@
 {
 	_backtrace = backtrace;
 	
-	[self.tableView reloadData];
-	if (self.backtrace.instructions.count > 0)
+	[_tableView reloadData];
+	if (_backtrace.instructions.count > 0)
 	{
-		self.shouldIgnoreTableSelection = YES;
-		[self.tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
+		_shouldIgnoreTableSelection = YES;
+		[_tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
 	}
 }
 
 - (IBAction)changeInstructionSelection:(id)__unused sender
 {
-	if (self.tableView.selectedRowIndexes.count > 0 && (NSUInteger)self.tableView.selectedRow < self.backtrace.instructions.count)
+	if (_tableView.selectedRowIndexes.count > 0 && (NSUInteger)_tableView.selectedRow < _backtrace.instructions.count)
 	{
-		ZGInstruction *selectedInstruction = [self.backtrace.instructions objectAtIndex:(NSUInteger)self.tableView.selectedRow];
-		[self.delegate backtraceSelectionChangedToAddress:selectedInstruction.variable.address];
+		ZGInstruction *selectedInstruction = [_backtrace.instructions objectAtIndex:(NSUInteger)_tableView.selectedRow];
+		id <ZGBacktraceViewControllerDelegate> delegate = _delegate;
+		[delegate backtraceSelectionChangedToAddress:selectedInstruction.variable.address];
 	}
 }
 
@@ -108,21 +97,23 @@
 
 - (BOOL)tableView:(NSTableView *)__unused tableView writeRowsWithIndexes:(NSIndexSet *)rowIndexes toPasteboard:(NSPasteboard *)pboard
 {
-	NSArray *variables = [[self.backtrace.instructions objectsAtIndexes:rowIndexes] valueForKey:@"variable"];
+	NSArray<ZGVariable *> *variables = [[_backtrace.instructions objectsAtIndexes:rowIndexes] zgMapUsingBlock:^(ZGInstruction *instruction) {
+		return instruction.variable;
+	}];
 	return [pboard setData:[NSKeyedArchiver archivedDataWithRootObject:variables] forType:ZGVariablePboardType];
 }
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)__unused tableView
 {
-	return (NSInteger)self.backtrace.instructions.count;
+	return (NSInteger)_backtrace.instructions.count;
 }
 
 - (id)tableView:(NSTableView *)__unused tableView objectValueForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)rowIndex
 {
 	id result = nil;
-	if (rowIndex >= 0 && (NSUInteger)rowIndex < self.backtrace.instructions.count)
+	if (rowIndex >= 0 && (NSUInteger)rowIndex < _backtrace.instructions.count)
 	{
-		ZGInstruction *instruction = [self.backtrace.instructions objectAtIndex:(NSUInteger)rowIndex];
+		ZGInstruction *instruction = [_backtrace.instructions objectAtIndex:(NSUInteger)rowIndex];
 		if ([tableColumn.identifier isEqualToString:@"backtrace"])
 		{
 			result = instruction.variable.fullAttributedDescription;
@@ -135,18 +126,18 @@
 - (void)tableViewSelectionDidChange:(NSNotification *)__unused aNotification
 {
 	// we should only ignore selection on the first row
-	if (self.shouldIgnoreTableSelection && ![[self.tableView selectedRowIndexes] isEqualToIndexSet:[NSIndexSet indexSetWithIndex:0]])
+	if (_shouldIgnoreTableSelection && ![[_tableView selectedRowIndexes] isEqualToIndexSet:[NSIndexSet indexSetWithIndex:0]])
 	{
-		self.shouldIgnoreTableSelection = NO;
+		_shouldIgnoreTableSelection = NO;
 	}
 	
-	if (!self.shouldIgnoreTableSelection)
+	if (!_shouldIgnoreTableSelection)
 	{
 		[self changeInstructionSelection:nil];
 	}
 	else
 	{
-		self.shouldIgnoreTableSelection = NO;
+		_shouldIgnoreTableSelection = NO;
 	}
 }
 
@@ -181,24 +172,24 @@
 
 #pragma mark Selection
 
-- (NSArray *)selectedInstructions
+- (NSArray<ZGInstruction *> *)selectedInstructions
 {
-	NSIndexSet *tableIndexSet = self.tableView.selectedRowIndexes;
-	NSInteger clickedRow = self.tableView.clickedRow;
+	NSIndexSet *tableIndexSet = _tableView.selectedRowIndexes;
+	NSInteger clickedRow = _tableView.clickedRow;
 	
 	NSIndexSet *selectionIndexSet = (clickedRow >= 0 && ![tableIndexSet containsIndex:(NSUInteger)clickedRow]) ? [NSIndexSet indexSetWithIndex:(NSUInteger)clickedRow] : tableIndexSet;
 	
-	return [self.backtrace.instructions objectsAtIndexes:selectionIndexSet];
+	return [_backtrace.instructions objectsAtIndexes:selectionIndexSet];
 }
 
 #pragma mark Actions
 
 - (IBAction)copy:(id)__unused sender
 {
-	NSMutableArray *descriptionComponents = [[NSMutableArray alloc] init];
-	NSMutableArray *variablesArray = [[NSMutableArray alloc] init];
+	NSMutableArray<NSString *> *descriptionComponents = [[NSMutableArray alloc] init];
+	NSMutableArray<ZGVariable *> *variablesArray = [[NSMutableArray alloc] init];
 	
-	for (ZGInstruction *instruction in self.selectedInstructions)
+	for (ZGInstruction *instruction in [self selectedInstructions])
 	{
 		[descriptionComponents addObject:[@[instruction.variable.addressStringValue, instruction.text, instruction.variable.stringValue] componentsJoinedByString:@"\t"]];
 		[variablesArray addObject:instruction.variable];
@@ -211,7 +202,7 @@
 
 - (IBAction)copyAddress:(id)__unused sender
 {
-	ZGInstruction *selectedInstruction = [self.selectedInstructions objectAtIndex:0];
+	ZGInstruction *selectedInstruction = [[self selectedInstructions] objectAtIndex:0];
 	
 	[[NSPasteboard generalPasteboard] declareTypes:@[NSStringPboardType] owner:self];
 	[[NSPasteboard generalPasteboard] setString:selectedInstruction.variable.addressStringValue	forType:NSStringPboardType];
@@ -219,8 +210,11 @@
 
 - (IBAction)showMemoryViewer:(id)__unused sender
 {
-	ZGInstruction *selectedInstruction = [self.selectedInstructions objectAtIndex:0];
-	[ZGNavigationPost postShowMemoryViewerWithProcess:self.process address:selectedInstruction.variable.address selectionLength:selectedInstruction.variable.size];
+	ZGInstruction *selectedInstruction = [[self selectedInstructions] objectAtIndex:0];
+	
+	id <ZGBacktraceViewControllerDelegate> delegate = _delegate;
+	id <ZGShowMemoryWindow> showMemoryWindowController =  delegate.delegate;
+	[showMemoryWindowController showMemoryViewerWindowWithProcess:_process address:selectedInstruction.variable.address selectionLength:selectedInstruction.variable.size];
 }
 
 @end

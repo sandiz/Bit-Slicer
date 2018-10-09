@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 1/30/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,16 +34,20 @@
 #import "ZGMemoryTypes.h"
 #import "ZGVariableTypes.h"
 
+NS_ASSUME_NONNULL_BEGIN
+
 @class ZGMachBinary;
 
 @interface ZGMachBinaryInfo : NSObject
 
-- (id)initWithMachHeaderAddress:(ZGMemoryAddress)machHeaderAddress segmentBytes:(const void *)segmentBytes commandSize:(uint32_t)commandSize;
+- (nullable id)initWithMachHeaderAddress:(ZGMemoryAddress)machHeaderAddress segmentBytes:(const void *)segmentBytes commandSize:(uint32_t)commandSize;
 
 @property (nonatomic, readonly) ZGMemorySize slide;
 @property (nonatomic, readonly) ZGMemoryAddress firstInstructionAddress; // aka location of __text section
 @property (nonatomic, readonly) NSRange totalSegmentRange;
 
-- (NSString *)segmentNameAtAddress:(ZGMemoryAddress)address;
+- (nullable NSString *)segmentNameAtAddress:(ZGMemoryAddress)address;
 
 @end
+
+NS_ASSUME_NONNULL_END

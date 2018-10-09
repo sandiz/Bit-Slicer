@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 2/22/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,11 +33,19 @@
 #import <Cocoa/Cocoa.h>
 #import "ZGMemoryTypes.h"
 
+NS_ASSUME_NONNULL_BEGIN
+
+@protocol ZGRegistersViewDelegate <NSObject>
+
+- (void)instructionPointerDidChange;
+
+@end
+
 @class ZGBreakPoint;
 
 @interface ZGRegistersViewController : NSViewController
 
-- (id)initWithUndoManager:(NSUndoManager *)undoManager;
+- (id)initWithWindow:(NSWindow *)window undoManager:(nullable NSUndoManager *)undoManager delegate:(nullable id <ZGRegistersViewDelegate>)delegate;
 
 @property (nonatomic, readonly) ZGMemoryAddress instructionPointer;
 @property (nonatomic, readonly) ZGMemoryAddress basePointer;
@@ -49,3 +55,5 @@
 - (void)updateRegistersFromBreakPoint:(ZGBreakPoint *)breakPoint;
 
 @end
+
+NS_ASSUME_NONNULL_END

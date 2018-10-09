@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 8/25/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,24 +31,28 @@
  */
 
 #import <Foundation/Foundation.h>
-#import "Python.h"
+#import "Python/Python.h"
 
 @class ZGPyVirtualMemory;
 @class ZGPyDebugger;
 
-@interface ZGPyScript : NSObject
+NS_ASSUME_NONNULL_BEGIN
 
-@property (nonatomic, copy) NSString *path;
-@property (nonatomic) PyObject *module;
-@property (nonatomic) PyObject *scriptObject;
-@property (nonatomic) PyObject *executeFunction;
-@property (nonatomic) NSTimeInterval lastTime;
-@property (nonatomic) NSTimeInterval deltaTime;
-@property (atomic) ZGPyVirtualMemory *virtualMemoryInstance;
-@property (atomic) ZGPyDebugger *debuggerInstance;
-@property (atomic) NSUInteger finishedCount;
+@interface ZGPyScript : NSObject
 
 - (id)initWithPath:(NSString *)path;
 - (NSString *)moduleName;
 
+@property (nonatomic, copy, readonly) NSString *path;
+@property (nonatomic, nullable) PyObject *module;
+@property (nonatomic, nullable) PyObject *scriptObject;
+@property (nonatomic, nullable) PyObject *executeFunction;
+@property (nonatomic) NSTimeInterval lastTime;
+@property (nonatomic) NSTimeInterval deltaTime;
+@property (atomic, nullable) ZGPyVirtualMemory *virtualMemoryInstance;
+@property (atomic, nullable) ZGPyDebugger *debuggerInstance;
+@property (atomic) NSUInteger finishedCount;
+
 @end
+
+NS_ASSUME_NONNULL_END

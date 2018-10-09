@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 1/16/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,21 +35,25 @@
 
 @class ZGVariable;
 
-typedef enum
+typedef NS_ENUM(uint8_t, ZGRegisterType)
 {
 	ZGRegisterGeneralPurpose,
 	ZGRegisterVector
-} ZGRegisterType;
+};
+
+NS_ASSUME_NONNULL_BEGIN
 
 @interface ZGRegister : NSObject
 
-@property (nonatomic, strong) ZGVariable *variable;
+@property (nonatomic) ZGVariable *variable;
 
 @property (nonatomic, readonly) void *rawValue;
 
 @property (nonatomic, readonly) ZGMemorySize size;
 @property (nonatomic, readonly) ZGRegisterType registerType;
 
-- (id)initWithRegisterType:(ZGRegisterType)registerType variable:(ZGVariable *)variable pointerSize:(ZGMemorySize)pointerSize;
+- (id)initWithRegisterType:(ZGRegisterType)registerType variable:(ZGVariable *)variable;
 
 @end
+
+NS_ASSUME_NONNULL_END

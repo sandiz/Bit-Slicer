@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 7/21/12.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,40 +35,41 @@
 #import "ZGProcess.h"
 #import "ZGDocumentTableController.h"
 #import "ZGVirtualMemory.h"
-#import "ZGVirtualMemoryHelpers.h"
 #import "ZGRegion.h"
 #import "ZGSearchData.h"
 #import "ZGSearchProgress.h"
 #import "ZGSearchResults.h"
 #import "ZGStoredData.h"
 #import "ZGCalculator.h"
-#import "ZGUtilities.h"
+#import "ZGDeliverUserNotifications.h"
+#import "ZGRunAlertPanel.h"
 #import "NSArrayAdditions.h"
 #import "ZGDocumentData.h"
-#import "ZGSearchToken.h"
 #import "ZGVariableController.h"
 #import "ZGMachBinary.h"
 #import "ZGTableView.h"
-#import "DDMathStringToken.h"
-#import "DDMathStringTokenizer.h"
-#import "DDMathOperator.h"
+#import "ZGDataValueExtracting.h"
+#import "ZGVariableDataInfo.h"
+#import "ZGMemoryAddressExpressionParsing.h"
+#import "ZGNullability.h"
 
-@interface ZGDocumentSearchController ()
-
-@property (nonatomic, assign) ZGDocumentWindowController *windowController;
-@property (nonatomic) ZGSearchProgress *searchProgress;
-@property (nonatomic) ZGSearchResults *temporarySearchResults;
-@property (nonatomic) ZGStoredData *tempSavedData;
-@property (atomic) BOOL isBusy;
-
-@property (nonatomic) ZGVariableType dataType;
-@property (nonatomic) ZGFunctionType functionType;
-@property (nonatomic) BOOL allowsNarrowing;
-@property (nonatomic) NSString *searchValueString;
-
-@end
+#import <DDMathParser/DDMathStringToken.h>
+#import <DDMathParser/DDMathStringTokenizer.h>
+#import <DDMathParser/DDMathOperator.h>
 
 @implementation ZGDocumentSearchController
+{
+	__weak ZGDocumentWindowController * _Nullable _windowController;
+	ZGDocumentData * _Nonnull _documentData;
+	ZGSearchProgress * _Nonnull _searchProgress;
+	ZGSearchResults * _Nullable _temporarySearchResults;
+	BOOL _isBusy;
+	ZGVariableType _dataType;
+	ZGFunctionType _functionType;
+	BOOL _allowsNarrowing;
+	NSString *_searchValueString;
+	ZGSearchData * _Nonnull _searchData;
+}
 
 #pragma mark Class Utilities
 
@@ -118,12 +117,12 @@
 {
 	self = [super init];
 	
-	if (self)
+	if (self != nil)
 	{
-		self.windowController = windowController;
-		self.documentData = windowController.documentData;
-		self.searchData = windowController.searchData;
-		self.searchProgress = [[ZGSearchProgress alloc] init];
+		_windowController = windowController;
+		_documentData = windowController.documentData;
+		_searchData = windowController.searchData;
+		_searchProgress = [[ZGSearchProgress alloc] init];
 	}
 	
 	return self;
@@ -132,9 +131,9 @@
 - (void)cleanUp
 {
 	// Force canceling
-	self.searchProgress.shouldCancelSearch = YES;
+	_searchProgress.shouldCancelSearch = YES;
 	
-	self.windowController = nil;
+	_windowController = nil;
 }
 
 #pragma mark Report information
@@ -146,29 +145,29 @@
 
 - (BOOL)isInNarrowSearchMode
 {
-	ZGVariableType dataType = self.dataType;
-	return [self.documentData.variables zgHasObjectMatchingCondition:^(ZGVariable *variable) {
+	ZGVariableType dataType = _dataType;
+	return [_documentData.variables zgHasObjectMatchingCondition:^(ZGVariable *variable) {
 		return [self isVariableNarrowable:variable withDataType:dataType];
 	}];
 }
 
 - (BOOL)canStartTask
 {
-	return !self.isBusy;
+	return !_isBusy;
 }
 
 - (BOOL)canCancelTask
 {
-	return self.isBusy;
+	return _isBusy;
 }
 
 #pragma mark Preparing and resuming from tasks
 
 - (void)prepareTask
 {
-	self.isBusy = YES;
+	_isBusy = YES;
 	
-	ZGDocumentWindowController *windowController = self.windowController;
+	ZGDocumentWindowController *windowController = _windowController;
 	
 	windowController.progressIndicator.doubleValue = 0;
 	
@@ -182,9 +181,9 @@
 
 - (void)resumeFromTaskAndMakeSearchFieldFirstResponder:(BOOL)shouldMakeSearchFieldFirstResponder
 {
-	self.isBusy = NO;
+	_isBusy = NO;
 	
-	ZGDocumentWindowController *windowController = self.windowController;
+	ZGDocumentWindowController *windowController = _windowController;
 	
 	[windowController.progressIndicator setHidden:YES];
 	
@@ -217,7 +216,7 @@
 
 - (void)updateMemoryStoreUserInterface:(NSTimer *)__unused timer
 {
-	self.windowController.progressIndicator.doubleValue = self.searchProgress.progress;
+	_windowController.progressIndicator.doubleValue = _searchProgress.progress;
 }
 
 - (NSString *)numberOfVariablesFoundDescriptionFromProgress:(ZGSearchProgress *)searchProgress
@@ -228,15 +227,12 @@
 	NSUInteger numberOfVariablesFound = searchProgress.numberOfVariablesFound;
 	NSString *formattedNumber = [numberOfVariablesFoundFormatter stringFromNumber:@(numberOfVariablesFound)];
 	
-	return [(floor(NSAppKitVersionNumber) > NSAppKitVersionNumber10_8) ?
-	[NSString stringWithFormat:ZGLocalizableSearchDocumentString(@"foundValuesLabelFormat"), numberOfVariablesFound] :
-	[NSString stringWithFormat:ZGLocalizableSearchDocumentString((numberOfVariablesFound != 1) ? @"foundMultipleValuesLabelFormat" : @"foundSingleValueLabelFormat"), numberOfVariablesFound]
-			stringByReplacingOccurrencesOfString:@"_NUM_" withString:formattedNumber];
+	return [[NSString stringWithFormat:ZGLocalizableSearchDocumentString(@"foundValuesLabelFormat"), numberOfVariablesFound] stringByReplacingOccurrencesOfString:@"_NUM_" withString:formattedNumber];
 }
 
 - (void)updateProgressBarFromProgress:(ZGSearchProgress *)searchProgress
 {
-	ZGDocumentWindowController *windowController = self.windowController;
+	ZGDocumentWindowController *windowController = _windowController;
 	windowController.progressIndicator.doubleValue = (double)searchProgress.progress;
 	
 	[windowController setStatusString:[self numberOfVariablesFoundDescriptionFromProgress:searchProgress]];
@@ -244,17 +240,17 @@
 
 - (void)progress:(ZGSearchProgress *)searchProgress advancedWithResultSet:(NSData *)resultSet
 {
-	if (!self.searchProgress.shouldCancelSearch)
+	if (!_searchProgress.shouldCancelSearch)
 	{
-		NSUInteger currentVariableCount = self.documentData.variables.count;
+		NSUInteger currentVariableCount = _documentData.variables.count;
 		
 		if (currentVariableCount < MAX_NUMBER_OF_VARIABLES_TO_FETCH && resultSet.length > 0)
 		{
-			ZGSearchResults *searchResults = [[ZGSearchResults alloc] initWithResultSets:@[resultSet] dataSize:self.searchData.dataSize pointerSize:self.searchData.pointerSize];
-			searchResults.dataType = self.dataType;
-			searchResults.enabled = self.allowsNarrowing;
+			ZGSearchResults *searchResults = [[ZGSearchResults alloc] initWithResultSets:@[resultSet] dataSize:_searchData.dataSize pointerSize:_searchData.pointerSize];
+			searchResults.dataType = _dataType;
+			searchResults.enabled = _allowsNarrowing;
 			[self fetchNumberOfVariables:MAX_NUMBER_OF_VARIABLES_TO_FETCH - currentVariableCount fromResults:searchResults];
-			[self.windowController.tableController.variablesTableView reloadData];
+			[_windowController.variablesTableView reloadData];
 		}
 		
 		[self updateProgressBarFromProgress:searchProgress];
@@ -263,10 +259,10 @@
 
 - (void)progressWillBegin:(ZGSearchProgress *)searchProgress
 {
-	self.windowController.progressIndicator.maxValue = (double)searchProgress.maxProgress;
+	_windowController.progressIndicator.maxValue = (double)searchProgress.maxProgress;
 	[self updateProgressBarFromProgress:searchProgress];
 	
-	self.searchProgress = searchProgress;
+	_searchProgress = searchProgress;
 }
 
 #pragma mark Searching
@@ -280,13 +276,13 @@
 		numberOfVariables = searchResults.addressCount;
 	}
 	
-	NSMutableArray *allVariables = [[NSMutableArray alloc] initWithArray:self.documentData.variables];
-	NSMutableArray *newVariables = [NSMutableArray array];
+	NSMutableArray<ZGVariable *> *allVariables = [[NSMutableArray alloc] initWithArray:_documentData.variables];
+	NSMutableArray<ZGVariable *> *newVariables = [NSMutableArray array];
 	
-	ZGDocumentWindowController *windowController = self.windowController;
+	ZGDocumentWindowController *windowController = _windowController;
 	
-	ZGVariableQualifier qualifier = (ZGVariableQualifier)self.documentData.qualifierTag;
-	CFByteOrder byteOrder = self.documentData.byteOrderTag;
+	ZGVariableQualifier qualifier = (ZGVariableQualifier)_documentData.qualifierTag;
+	CFByteOrder byteOrder = _documentData.byteOrderTag;
 	ZGProcess *currentProcess = windowController.currentProcess;
 	ZGMemorySize pointerSize = currentProcess.pointerSize;
 	
@@ -298,7 +294,7 @@
 		 initWithValue:NULL
 		 size:dataSize
 		 address:variableAddress
-		 type:(ZGVariableType)searchResults.dataType
+		 type:searchResults.dataType
 		 qualifier:qualifier
 		 pointerSize:pointerSize
 		 description:[[NSAttributedString alloc] initWithString:@""]
@@ -313,9 +309,9 @@
 	[ZGVariableController annotateVariables:newVariables process:currentProcess];
 	
 	[allVariables addObjectsFromArray:newVariables];
-	self.documentData.variables = [NSArray arrayWithArray:allVariables];
+	_documentData.variables = [NSArray arrayWithArray:allVariables];
 	
-	if (self.documentData.variables.count > 0)
+	if (_documentData.variables.count > 0)
 	{
 		[windowController.tableController updateVariableValuesInRange:NSMakeRange(allVariables.count - newVariables.count, newVariables.count)];
 	}
@@ -323,63 +319,63 @@
 
 - (void)fetchNumberOfVariables:(NSUInteger)numberOfVariables
 {
-	[self fetchNumberOfVariables:numberOfVariables fromResults:self.searchResults];
+	[self fetchNumberOfVariables:numberOfVariables fromResults:_searchResults];
 }
 
 - (void)fetchVariablesFromResults
 {
-	if (self.documentData.variables.count < MAX_NUMBER_OF_VARIABLES_TO_FETCH)
+	if (_documentData.variables.count < MAX_NUMBER_OF_VARIABLES_TO_FETCH)
 	{
-		[self fetchNumberOfVariables:(MAX_NUMBER_OF_VARIABLES_TO_FETCH - self.documentData.variables.count) fromResults:self.searchResults];
+		[self fetchNumberOfVariables:(MAX_NUMBER_OF_VARIABLES_TO_FETCH - _documentData.variables.count) fromResults:_searchResults];
 	}
 }
 
-- (void)finalizeSearchWithOldVariables:(NSArray *)oldVariables andNotSearchedVariables:(NSArray *)notSearchedVariables
+- (void)finalizeSearchWithOldVariables:(NSArray<ZGVariable *> *)oldVariables andNotSearchedVariables:(NSArray<ZGVariable *> *)notSearchedVariables
 {
-	ZGDocumentWindowController *windowController = self.windowController;
+	ZGDocumentWindowController *windowController = _windowController;
 	
-	if (!self.searchProgress.shouldCancelSearch)
+	if (!_searchProgress.shouldCancelSearch)
 	{
-		ZGDeliverUserNotification(ZGLocalizableSearchDocumentString(@"searchFinishedNotificationTitle"), windowController.currentProcess.name, [self numberOfVariablesFoundDescriptionFromProgress:self.searchProgress]);
+		ZGDeliverUserNotification(ZGLocalizableSearchDocumentString(@"searchFinishedNotificationTitle"), windowController.currentProcess.name, [self numberOfVariablesFoundDescriptionFromProgress:_searchProgress], nil);
 		
-		if (notSearchedVariables.count + self.temporarySearchResults.addressCount != oldVariables.count)
+		if (notSearchedVariables.count + _temporarySearchResults.addressCount != oldVariables.count)
 		{
 			windowController.undoManager.actionName = ZGLocalizableSearchDocumentString(@"undoSearchAction");
-			[[windowController.undoManager prepareWithInvocationTarget:windowController] updateVariables:oldVariables searchResults:self.searchResults];
+			[(ZGDocumentWindowController *)[windowController.undoManager prepareWithInvocationTarget:windowController] updateVariables:oldVariables searchResults:_searchResults];
 			
-			self.searchResults = self.temporarySearchResults;
-			self.documentData.variables = notSearchedVariables;
+			_searchResults = _temporarySearchResults;
+			_documentData.variables = notSearchedVariables;
 			[self fetchVariablesFromResults];
-			[windowController.tableController.variablesTableView reloadData];
+			[windowController.variablesTableView reloadData];
 			[windowController markDocumentChange];
 		}
 	}
 	else
 	{
-		self.documentData.variables = oldVariables;
-		[windowController.tableController.variablesTableView reloadData];
+		_documentData.variables = oldVariables;
+		[windowController.variablesTableView reloadData];
 	}
 	
 	[windowController updateOcclusionActivity];
 	
-	self.temporarySearchResults = nil;
+	_temporarySearchResults = nil;
 	
 	[windowController updateNumberOfValuesDisplayedStatus];
 	
-	if (self.allowsNarrowing)
+	if (_allowsNarrowing)
 	{
 		BOOL shouldMakeSearchFieldFirstResponder = YES;
 		
 		// Make the table first responder if we come back from a search and only one variable was found. Hopefully the user found what he was looking for.
-		if (!self.searchProgress.shouldCancelSearch && self.documentData.variables.count <= MAX_NUMBER_OF_VARIABLES_TO_FETCH)
+		if (!_searchProgress.shouldCancelSearch && _documentData.variables.count <= MAX_NUMBER_OF_VARIABLES_TO_FETCH)
 		{
-			NSArray *filteredVariables = [self.documentData.variables zgFilterUsingBlock:(zg_array_filter_t)^(ZGVariable *variable) {
+			NSArray<ZGVariable *> *filteredVariables = [_documentData.variables zgFilterUsingBlock:(zg_array_filter_t)^(ZGVariable *variable) {
 				return variable.enabled;
 			}];
 			
 			if (filteredVariables.count == 1)
 			{
-				[windowController.window makeFirstResponder:windowController.tableController.variablesTableView];
+				[windowController.window makeFirstResponder:windowController.variablesTableView];
 				shouldMakeSearchFieldFirstResponder = NO;
 			}
 		}
@@ -397,7 +393,7 @@
 
 - (BOOL)retrieveFlagsSearchDataWithDataType:(ZGVariableType)dataType functionType:(ZGFunctionType)functionType error:(NSError * __autoreleasing *)error
 {
-	ZGDocumentWindowController *windowController = self.windowController;
+	ZGDocumentWindowController *windowController = _windowController;
 	
 	if (!windowController.showsFlags) return YES;
 	
@@ -426,20 +422,25 @@
 			{
 				// Clearly a range type of search
 				ZGMemorySize rangeDataSize;
-				self.searchData.rangeValue = ZGValueFromString(currentProcess.is64Bit, flagsExpression, dataType, &rangeDataSize);
+				_searchData.rangeValue = ZGValueFromString(currentProcess.is64Bit, flagsExpression, dataType, &rangeDataSize);
+				if (_searchData.rangeValue == NULL)
+				{
+					NSLog(@"Failed to parse range value from %@...", flagsExpression);
+					return NO;
+				}
 			}
 			else
 			{
-				self.searchData.rangeValue = NULL;
+				_searchData.rangeValue = NULL;
 			}
 			
 			if (ZGIsFunctionTypeGreaterThan(functionType))
 			{
-				self.documentData.lastBelowRangeValue = flagsStringValue;
+				_documentData.lastBelowRangeValue = flagsStringValue;
 			}
 			else if (ZGIsFunctionTypeLessThan(functionType))
 			{
-				self.documentData.lastAboveRangeValue = flagsStringValue;
+				_documentData.lastAboveRangeValue = flagsStringValue;
 			}
 		}
 		else
@@ -449,18 +450,18 @@
 				// Clearly an epsilon flag
 				ZGMemorySize epsilonDataSize;
 				void *epsilon = ZGValueFromString(currentProcess.is64Bit, flagsExpression, ZGDouble, &epsilonDataSize);
-				if (epsilon)
+				if (epsilon != NULL)
 				{
-					self.searchData.epsilon = *((double *)epsilon);
+					_searchData.epsilon = *((double *)epsilon);
 					free(epsilon);
 				}
 			}
 			else
 			{
-				self.searchData.epsilon = DEFAULT_FLOATING_POINT_EPSILON;
+				_searchData.epsilon = DEFAULT_FLOATING_POINT_EPSILON;
 			}
 			
-			self.documentData.lastEpsilonValue = flagsStringValue;
+			_documentData.lastEpsilonValue = flagsStringValue;
 		}
 	}
 	
@@ -477,17 +478,25 @@
 	{
 		if (!ZGIsValidNumber(stringValue))
 		{
-			if (error != NULL)
-			{
-				*error = [NSError errorWithDomain:ZGRetrieveFlagsErrorDomain code:0 userInfo:@{ZGRetrieveFlagsErrorDescriptionKey : [NSString stringWithFormat:ZGLocalizableSearchDocumentString(@"invalidFlagsFieldErrorMessageFormat"), label]}];
-			}
-			
 			success = NO;
 		}
 		else
 		{
-			*boundaryAddress = ZGMemoryAddressFromExpression([ZGCalculator evaluateExpression:stringValue]);
+			NSString *evaluatedExpression = [ZGCalculator evaluateExpression:stringValue];
+			if (evaluatedExpression != nil)
+			{
+				*boundaryAddress = ZGMemoryAddressFromExpression(evaluatedExpression);
+			}
+			else
+			{
+				success = NO;
+			}
 		}
+	}
+	
+	if (!success && error != NULL)
+	{
+		*error = [NSError errorWithDomain:ZGRetrieveFlagsErrorDomain code:0 userInfo:@{ZGRetrieveFlagsErrorDescriptionKey : [NSString stringWithFormat:ZGLocalizableSearchDocumentString(@"invalidFlagsFieldErrorMessageFormat"), label]}];
 	}
 	
 	return success;
@@ -495,28 +504,28 @@
 
 - (BOOL)retrieveSearchDataWithError:(NSError * __autoreleasing *)error
 {
-	ZGDocumentWindowController *windowController = self.windowController;
-	ZGVariableType dataType = self.dataType;
+	ZGDocumentWindowController *windowController = _windowController;
+	ZGVariableType dataType = _dataType;
 	
-	self.searchData.pointerSize = windowController.currentProcess.pointerSize;
+	_searchData.pointerSize = windowController.currentProcess.pointerSize;
 	
 	// Set default search arguments
-	self.searchData.epsilon = DEFAULT_FLOATING_POINT_EPSILON;
-	self.searchData.rangeValue = NULL;
+	_searchData.epsilon = DEFAULT_FLOATING_POINT_EPSILON;
+	_searchData.rangeValue = NULL;
 	
-	ZGFunctionType functionType = self.functionType;
+	ZGFunctionType functionType = _functionType;
 	
 	ZGProcess *currentProcess = windowController.currentProcess;
 	BOOL is64Bit = currentProcess.is64Bit;
 	
-	self.searchData.shouldCompareStoredValues = ZGIsFunctionTypeStore(functionType);
+	_searchData.shouldCompareStoredValues = ZGIsFunctionTypeStore(functionType);
 	
-	if (!self.searchData.shouldCompareStoredValues)
+	if (!_searchData.shouldCompareStoredValues)
 	{
-		NSString *searchValueInput = self.searchValueString;
+		NSString *searchValueInput = _searchValueString;
 		NSString *finalSearchExpression = ZGIsNumericalDataType(dataType) ? [ZGCalculator evaluateExpression:searchValueInput] : searchValueInput;
 		
-		if (ZGIsNumericalDataType(dataType) && !ZGIsFunctionTypeStore(self.functionType) && !ZGIsValidNumber(finalSearchExpression))
+		if (ZGIsNumericalDataType(dataType) && !ZGIsFunctionTypeStore(_functionType) && !ZGIsValidNumber(finalSearchExpression))
 		{
 			if (error != NULL)
 			{
@@ -526,9 +535,22 @@
 		}
 		
 		ZGMemorySize dataSize = 0;
-		self.searchData.searchValue = ZGValueFromString(is64Bit, finalSearchExpression, dataType, &dataSize);
+		void *searchValue = ZGValueFromString(is64Bit, finalSearchExpression, dataType, &dataSize);
+		if (searchValue != NULL)
+		{
+			_searchData.searchValue = searchValue;
+		}
+		else
+		{
+			if (error != NULL)
+			{
+				*error = [NSError errorWithDomain:ZGRetrieveFlagsErrorDomain code:0 userInfo:@{ZGRetrieveFlagsErrorDescriptionKey : @""}];
+			}
+			NSLog(@"Failed to retrieve search value from %@", finalSearchExpression);
+			return NO;
+		}
 		
-		if (self.searchData.shouldIncludeNullTerminator)
+		if (_searchData.shouldIncludeNullTerminator)
 		{
 			if (dataType == ZGString16)
 			{
@@ -540,11 +562,12 @@
 			}
 		}
 		
-		self.searchData.dataSize = dataSize;
+		_searchData.dataSize = dataSize;
 		
 		if (dataType == ZGByteArray)
 		{
-			self.searchData.byteArrayFlags = ZGAllocateFlagsForByteArrayWildcards(finalSearchExpression);
+			// If this returns NULL, then there just were no wildcards
+			_searchData.byteArrayFlags = ZGAllocateFlagsForByteArrayWildcards(finalSearchExpression);
 		}
 		else if (dataType == ZGPointer)
 		{
@@ -571,7 +594,7 @@
 			 */
 			
 			NSArray *machBinaries = [ZGMachBinary machBinariesInProcess:currentProcess];
-			self.searchData.machBinariesInfo =  [machBinaries zgMapUsingBlock:^(ZGMachBinary *machBinary) {
+			_searchData.machBinariesInfo =  [machBinaries zgMapUsingBlock:^(ZGMachBinary *machBinary) {
 				return [machBinary machBinaryInfoInProcess:currentProcess];
 			}];
 		}
@@ -587,12 +610,12 @@
 			return NO;
 		}
 		
-		self.searchData.searchValue = NULL;
-		self.searchData.dataSize = ZGDataSizeFromNumericalDataType(is64Bit, dataType);
+		_searchData.searchValue = NULL;
+		_searchData.dataSize = ZGDataSizeFromNumericalDataType(is64Bit, dataType);
 		
 		if (ZGIsFunctionTypeLinear(functionType))
 		{
-			NSString *linearExpression = self.searchValueString;
+			NSString *linearExpression = _searchValueString;
 			NSString *additiveConstantString = nil;
 			NSString *multiplicativeConstantString = nil;
 			
@@ -605,10 +628,10 @@
 				return NO;
 			}
 			
-			self.searchData.additiveConstant = ZGValueFromString(windowController.currentProcess.is64Bit, additiveConstantString, dataType, NULL);
-			self.searchData.multiplicativeConstant = ZGValueFromString(windowController.currentProcess.is64Bit, multiplicativeConstantString, dataType, NULL);
+			_searchData.additiveConstant = ZGValueFromString(windowController.currentProcess.is64Bit, additiveConstantString, dataType, NULL);
+			_searchData.multiplicativeConstant = ZGValueFromString(windowController.currentProcess.is64Bit, multiplicativeConstantString, dataType, NULL);
 			
-			if (self.searchData.additiveConstant == NULL || self.searchData.multiplicativeConstant == NULL)
+			if (_searchData.additiveConstant == NULL || _searchData.multiplicativeConstant == NULL)
 			{
 				if (error != NULL)
 				{
@@ -619,24 +642,39 @@
 		}
 	}
 	
-	if (CFByteOrderGetCurrent() != self.documentData.byteOrderTag)
+	if (CFByteOrderGetCurrent() != _documentData.byteOrderTag && ZGSupportsEndianness(dataType))
 	{
-		self.searchData.bytesSwapped = YES;
+		_searchData.bytesSwapped = YES;
 		if (ZGSupportsSwappingBeforeSearch(functionType, dataType))
 		{
-			self.searchData.swappedValue = ZGSwappedValue(is64Bit, self.searchData.searchValue, dataType, self.searchData.dataSize);
+			void *searchValue = _searchData.searchValue;
+			assert(searchValue != NULL);
+			void *swappedValue = ZGSwappedValue(is64Bit, searchValue, dataType, _searchData.dataSize);
+			if (swappedValue != NULL)
+			{
+				_searchData.swappedValue = swappedValue;
+			}
+			else
+			{
+				if (error != NULL)
+				{
+					*error = [NSError errorWithDomain:ZGRetrieveFlagsErrorDomain code:0 userInfo:@{ZGRetrieveFlagsErrorDescriptionKey : @""}];
+				}
+				NSLog(@"Failed allocating memory for swapped value..");
+				return NO;
+			}
 		}
 	}
 	else
 	{
-		self.searchData.bytesSwapped = NO;
-		self.searchData.swappedValue = NULL;
+		_searchData.bytesSwapped = NO;
+		_searchData.swappedValue = NULL;
 	}
 	
-	self.searchData.dataAlignment =
-		self.documentData.ignoreDataAlignment
+	_searchData.dataAlignment =
+		_documentData.ignoreDataAlignment
 		? sizeof(int8_t)
-		: ZGDataAlignment(windowController.currentProcess.is64Bit, dataType, self.searchData.dataSize);
+		: ZGDataAlignment(windowController.currentProcess.is64Bit, dataType, _searchData.dataSize);
 	
 	if (![self retrieveFlagsSearchDataWithDataType:dataType functionType:functionType error:error])
 	{
@@ -648,28 +686,28 @@
 	BOOL retrievedBoundaryAddress =
 	[self
 	 getBoundaryAddress:&beginningAddress
-	 fromStringValue:self.documentData.beginningAddressStringValue
+	 fromStringValue:_documentData.beginningAddressStringValue
 	 label:ZGLocalizableSearchDocumentString(@"beginningAddressLabel")
 	 error:error];
 	
 	if (!retrievedBoundaryAddress) return NO;
 	
-	self.searchData.beginAddress = beginningAddress;
+	_searchData.beginAddress = beginningAddress;
 	
 	ZGMemoryAddress endingAddress = MAX_MEMORY_ADDRESS;
 	
 	retrievedBoundaryAddress =
 	[self
 	 getBoundaryAddress:&endingAddress
-	 fromStringValue:self.documentData.endingAddressStringValue
+	 fromStringValue:_documentData.endingAddressStringValue
 	 label:ZGLocalizableSearchDocumentString(@"endingAddressLabel")
 	 error:error];
 	
 	if (!retrievedBoundaryAddress) return NO;
 	
-	self.searchData.endAddress = endingAddress;
+	_searchData.endAddress = endingAddress;
 	
-	if (self.searchData.beginAddress >= self.searchData.endAddress)
+	if (_searchData.beginAddress >= _searchData.endAddress)
 	{
 		if (error != NULL)
 		{
@@ -681,17 +719,18 @@
 	return YES;
 }
 
-- (void)searchVariables:(NSArray *)variables byNarrowing:(BOOL)isNarrowing usingCompletionBlock:(dispatch_block_t)completeSearchBlock
+- (void)searchVariables:(NSArray<ZGVariable *> *)variables byNarrowing:(BOOL)isNarrowing usingCompletionBlock:(dispatch_block_t)completeSearchBlock
 {
-	ZGProcess *currentProcess = self.windowController.currentProcess;
-	ZGVariableType dataType = self.dataType;
+	ZGDocumentWindowController *windowController = _windowController;
+	ZGProcess *currentProcess = windowController.currentProcess;
+	ZGVariableType dataType = _dataType;
 	ZGSearchResults *firstSearchResults = nil;
 	if (isNarrowing)
 	{
 		NSMutableData *firstResultSets = [NSMutableData data];
 		for (ZGVariable *variable in variables)
 		{
-			if (self.searchData.pointerSize == sizeof(ZGMemoryAddress))
+			if (_searchData.pointerSize == sizeof(ZGMemoryAddress))
 			{
 				ZGMemoryAddress variableAddress = variable.address;
 				[firstResultSets appendBytes:&variableAddress length:sizeof(variableAddress)];
@@ -702,21 +741,21 @@
 				[firstResultSets appendBytes:&variableAddress length:sizeof(variableAddress)];
 			}
 		}
-		firstSearchResults = [[ZGSearchResults alloc] initWithResultSets:@[firstResultSets] dataSize:self.searchData.dataSize pointerSize:self.searchData.pointerSize];
+		firstSearchResults = [[ZGSearchResults alloc] initWithResultSets:@[firstResultSets] dataSize:_searchData.dataSize pointerSize:_searchData.pointerSize];
 	}
 	
 	dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
 		if (!isNarrowing)
 		{
-			self.temporarySearchResults = ZGSearchForData(currentProcess.processTask, self.searchData, self, dataType, (ZGVariableQualifier)self.documentData.qualifierTag, self.functionType);
+			self->_temporarySearchResults = ZGSearchForData(currentProcess.processTask, self->_searchData, self, dataType, (ZGVariableQualifier)self->_documentData.qualifierTag, self->_functionType);
 		}
 		else
 		{
-			self.temporarySearchResults = ZGNarrowSearchForData(currentProcess.processTask, self.searchData, self, dataType, (ZGVariableQualifier)self.documentData.qualifierTag, self.functionType, firstSearchResults, (self.searchResults.dataType == dataType && currentProcess.pointerSize == self.searchResults.pointerSize) ? self.searchResults : nil);
+			self->_temporarySearchResults = ZGNarrowSearchForData(currentProcess.processTask, self->_searchData, self, dataType, self->_documentData.qualifierTag, self->_functionType, firstSearchResults, (self->_searchResults.dataType == dataType && currentProcess.pointerSize == self->_searchResults.pointerSize) ? self->_searchResults : nil);
 		}
 		
-		self.temporarySearchResults.dataType = dataType;
-		self.temporarySearchResults.enabled = self.allowsNarrowing;
+		self->_temporarySearchResults.dataType = dataType;
+		self->_temporarySearchResults.enabled = self->_allowsNarrowing;
 		
 		dispatch_async(dispatch_get_main_queue(), completeSearchBlock);
 	});
@@ -724,25 +763,25 @@
 
 - (void)searchVariablesWithString:(NSString *)searchStringValue withDataType:(ZGVariableType)dataType functionType:(ZGFunctionType)functionType allowsNarrowing:(BOOL)allowsNarrowing
 {
-	self.dataType = dataType;
-	self.functionType = functionType;
-	self.searchValueString = searchStringValue;
-	self.allowsNarrowing = allowsNarrowing;
+	_dataType = dataType;
+	_functionType = functionType;
+	_searchValueString = [searchStringValue copy];
+	_allowsNarrowing = allowsNarrowing;
 	
 	NSError *error = nil;
 	if (![self retrieveSearchDataWithError:&error])
 	{
-		ZGRunAlertPanelWithOKButton(ZGLocalizableSearchDocumentString(@"invalidSearchInputAlertTitle"), [error.userInfo objectForKey:ZGRetrieveFlagsErrorDescriptionKey]);
+		ZGRunAlertPanelWithOKButton(ZGLocalizableSearchDocumentString(@"invalidSearchInputAlertTitle"), ZGUnwrapNullableObject(error.userInfo[ZGRetrieveFlagsErrorDescriptionKey]));
 		return;
 	}
 	
-	NSMutableArray *notSearchedVariables = [[NSMutableArray alloc] init];
-	NSMutableArray *searchedVariables = [[NSMutableArray alloc] init];
+	NSMutableArray<ZGVariable *> *notSearchedVariables = [[NSMutableArray alloc] init];
+	NSMutableArray<ZGVariable *> *searchedVariables = [[NSMutableArray alloc] init];
 	
 	BOOL isNarrowingSearch = allowsNarrowing && [self isInNarrowSearchMode];
 	
 	// Add all variables whose value should not be searched for, first
-	for (ZGVariable *variable in self.documentData.variables)
+	for (ZGVariable *variable in _documentData.variables)
 	{
 		if (!isNarrowingSearch || ![self isVariableNarrowable:variable withDataType:dataType])
 		{
@@ -756,22 +795,18 @@
 	
 	[self prepareTask];
 	
-	id searchDataActivity = nil;
-	if ([[NSProcessInfo processInfo] respondsToSelector:@selector(beginActivityWithOptions:reason:)])
-	{
-		searchDataActivity = [[NSProcessInfo processInfo] beginActivityWithOptions:NSActivityUserInitiated reason:@"Searching Data"];
-	}
+	id searchDataActivity = [[NSProcessInfo processInfo] beginActivityWithOptions:NSActivityUserInitiated reason:@"Searching Data"];
 	
-	NSArray *oldVariables = self.documentData.variables;
+	NSArray<ZGVariable *> *oldVariables = _documentData.variables;
 	
-	self.documentData.variables = notSearchedVariables;
-	[self.windowController.tableController.variablesTableView reloadData];
+	_documentData.variables = notSearchedVariables;
+	[_windowController.variablesTableView reloadData];
 	
 	[self searchVariables:searchedVariables byNarrowing:isNarrowingSearch usingCompletionBlock:^ {
-		if (self.windowController != nil)
+		if (self->_windowController != nil)
 		{
-			self.searchData.searchValue = NULL;
-			self.searchData.swappedValue = NULL;
+			self->_searchData.searchValue = NULL;
+			self->_searchData.swappedValue = NULL;
 			
 			if (searchDataActivity != nil)
 			{
@@ -785,17 +820,17 @@
 
 - (void)cancelTask
 {
-	ZGDocumentWindowController *windowController = self.windowController;
-	if (self.searchProgress.progressType == ZGSearchProgressMemoryScanning)
+	ZGDocumentWindowController *windowController = _windowController;
+	if (_searchProgress.progressType == ZGSearchProgressMemoryScanning)
 	{
 		[windowController setStatusString:ZGLocalizableSearchDocumentString(@"cancelingSearchStatusLabel")];
 	}
-	else if (self.searchProgress.progressType == ZGSearchProgressMemoryStoring)
+	else if (_searchProgress.progressType == ZGSearchProgressMemoryStoring)
 	{
 		[windowController setStatusString:ZGLocalizableSearchDocumentString(@"cancelingStoringValuesStatusLabel")];
 	}
 	
-	self.searchProgress.shouldCancelSearch = YES;
+	_searchProgress.shouldCancelSearch = YES;
 }
 
 #pragma mark Storing all values
@@ -804,21 +839,21 @@
 {
 	[self prepareTask];
 	
-	ZGDocumentWindowController *windowController = self.windowController;
+	ZGDocumentWindowController *windowController = _windowController;
 	
 	[windowController setStatusString:ZGLocalizableSearchDocumentString(@"storingValuesStatusLabel")];
 	
 	dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-		self.tempSavedData = [ZGStoredData storedDataFromProcessTask:windowController.currentProcess.processTask];
+		__block ZGStoredData *tempSavedData = [ZGStoredData storedDataFromProcessTask:windowController.currentProcess.processTask];
 		
 		dispatch_async(dispatch_get_main_queue(), ^{
-			if (!self.searchProgress.shouldCancelSearch)
+			if (!self->_searchProgress.shouldCancelSearch)
 			{
-				self.searchData.savedData = self.tempSavedData;
-				self.tempSavedData = nil;
+				self->_searchData.savedData = tempSavedData;
+				tempSavedData = nil;
 				windowController.storeValuesButton.image = [NSImage imageNamed:@"container_filled"];
 				
-				if (![[self class] hasStoredValueTokenFromExpression:self.documentData.searchValue])
+				if (![[self class] hasStoredValueTokenFromExpression:self->_documentData.searchValue])
 				{
 					[windowController insertStoredValueToken];
 				}

@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 9/6/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -282,7 +280,7 @@ static double ZGSwapDoubleHostToBig(double value)
 			
 			for (ZGMemorySize pointerSize = 4; pointerSize <= 8; pointerSize += 4)
 			{
-				XCTAssertEqualWithAccuracy([[[[ZGVariable alloc] initWithValue:(double []){byteOrderFunction(0.0)} size:0 address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue] floatValue], 0.0f, 0.01);
+				XCTAssertEqualWithAccuracy([[[[ZGVariable alloc] initWithValue:(double []){byteOrderFunction(0.0)} size:0 address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue] floatValue], 0.0, 0.01);
 				
 				XCTAssertEqualWithAccuracy([[[[ZGVariable alloc] initWithValue:(double []){byteOrderFunction(35.0)} size:0 address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue] doubleValue], 35.0, 0.01);
 				
@@ -356,19 +354,19 @@ static double ZGSwapDoubleHostToBig(double value)
 			{
 				NSString *testString = @"test";
 				const char *testCString = [testString cStringUsingEncoding:stringEncoding];
-				XCTAssertEqualObjects([[[ZGVariable alloc] initWithValue:(void *)testCString size:strlen(testCString) address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue], [NSString stringWithCString:testCString encoding:stringEncoding]);
+				XCTAssertEqualObjects([[[ZGVariable alloc] initWithValue:testCString size:strlen(testCString) address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue], [NSString stringWithCString:testCString encoding:stringEncoding]);
 				
 				NSString *testString2 = @"test†å∫¢";
 				const char *testCString2 = [testString2 cStringUsingEncoding:stringEncoding];
-				XCTAssertEqualObjects([[[ZGVariable alloc] initWithValue:(void *)testCString2 size:strlen(testCString2) address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue], [NSString stringWithCString:testCString2 encoding:stringEncoding]);
+				XCTAssertEqualObjects([[[ZGVariable alloc] initWithValue:testCString2 size:strlen(testCString2) address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue], [NSString stringWithCString:testCString2 encoding:stringEncoding]);
 				
 				NSString *emptyString = @"";
 				const char *emptyCString = [emptyString cStringUsingEncoding:stringEncoding];
-				XCTAssertEqualObjects([[[ZGVariable alloc] initWithValue:(void *)emptyCString size:strlen(emptyCString) address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue], emptyString);
+				XCTAssertEqualObjects([[[ZGVariable alloc] initWithValue:emptyCString size:strlen(emptyCString) address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue], emptyString);
 				
 				NSString *longString = @"This is a really long string maybe. This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe. ";
 				const char *longCString = [longString cStringUsingEncoding:stringEncoding];
-				XCTAssertEqualObjects([[[ZGVariable alloc] initWithValue:(void *)longCString size:strlen(longCString) address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue], [NSString stringWithCString:longCString encoding:stringEncoding]);
+				XCTAssertEqualObjects([[[ZGVariable alloc] initWithValue:longCString size:strlen(longCString) address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue], [NSString stringWithCString:longCString encoding:stringEncoding]);
 			}
 		}
 	}
@@ -394,19 +392,19 @@ static double ZGSwapDoubleHostToBig(double value)
 			{
 				NSString *testString = @"test";
 				const char *testCString = [testString cStringUsingEncoding:stringEncoding];
-				XCTAssertEqualObjects([[[ZGVariable alloc] initWithValue:(void *)testCString size:strlen(testCString) address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue], [NSString stringWithCString:testCString encoding:stringEncoding]);
+				XCTAssertEqualObjects([[[ZGVariable alloc] initWithValue:testCString size:strlen(testCString) address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue], [NSString stringWithCString:testCString encoding:stringEncoding]);
 				
 				NSString *testString2 = @"test†å∫¢";
 				const char *testCString2 = [testString2 cStringUsingEncoding:stringEncoding];
-				XCTAssertEqualObjects([[[ZGVariable alloc] initWithValue:(void *)testCString2 size:strlen(testCString2) address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue], [NSString stringWithCString:testCString2 encoding:stringEncoding]);
+				XCTAssertEqualObjects([[[ZGVariable alloc] initWithValue:testCString2 size:strlen(testCString2) address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue], [NSString stringWithCString:testCString2 encoding:stringEncoding]);
 				
 				NSString *emptyString = @"";
 				const char *emptyCString = [emptyString cStringUsingEncoding:stringEncoding];
-				XCTAssertEqualObjects([[[ZGVariable alloc] initWithValue:(void *)emptyCString size:strlen(emptyCString) address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue], emptyString);
+				XCTAssertEqualObjects([[[ZGVariable alloc] initWithValue:emptyCString size:strlen(emptyCString) address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue], emptyString);
 				
 				NSString *longString = @"This is a really long string maybe. This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe.  This is a really long string maybe. ";
 				const char *longCString = [longString cStringUsingEncoding:stringEncoding];
-				XCTAssertEqualObjects([[[ZGVariable alloc] initWithValue:(void *)longCString size:strlen(longCString) address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue], [NSString stringWithCString:longCString encoding:stringEncoding]);
+				XCTAssertEqualObjects([[[ZGVariable alloc] initWithValue:longCString size:strlen(longCString) address:0x0 type:type qualifier:qualifier pointerSize:pointerSize byteOrder:byteOrder] stringValue], [NSString stringWithCString:longCString encoding:stringEncoding]);
 			}
 		}
 	}
@@ -451,13 +449,13 @@ static double ZGSwapDoubleHostToBig(double value)
 	
 	XCTAssertEqualObjects(pointerVariable.stringValue, @"0xFFFFFFFFFFFFFFFF");
 	
-	[pointerVariable setPointerSize:4];
+	[pointerVariable changePointerSize:4];
 	pointerVariable.rawValue = (uint32_t []){(uint32_t)-1};
 	
 	XCTAssertEqualObjects(pointerVariable.stringValue, @"0xFFFFFFFF");
 	
 	const char bytes[] = {0x2F, 0x69, 0x64, 0x65, 0x76, 0x67, 0x61, 0x6D};
-	ZGVariable *variable = [[ZGVariable alloc] initWithValue:(void *)bytes size:sizeof(bytes) address:0x0 type:ZGByteArray qualifier:ZGSigned pointerSize:8];
+	ZGVariable *variable = [[ZGVariable alloc] initWithValue:bytes size:sizeof(bytes) address:0x0 type:ZGByteArray qualifier:ZGSigned pointerSize:8];
 	
 	XCTAssertEqualObjects(variable.stringValue, @"2F 69 64 65 76 67 61 6D");
 	

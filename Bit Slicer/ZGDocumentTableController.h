@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 7/21/12.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,22 +30,26 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import <Foundation/Foundation.h>
+#import <Cocoa/Cocoa.h>
 
 @class ZGDocumentWindowController;
-@class ZGTableView;
+@class ZGVariable;
 
-@interface ZGDocumentTableController : NSObject <NSTableViewDelegate>
+NS_ASSUME_NONNULL_BEGIN
 
-@property (assign, nonatomic) ZGTableView *variablesTableView;
+@interface ZGDocumentTableController : NSObject <NSTableViewDelegate, NSTableViewDataSource>
 
 - (id)initWithWindowController:(ZGDocumentWindowController *)windowController;
 
 - (BOOL)updateWatchVariablesTimer;
 - (BOOL)updateVariableValuesInRange:(NSRange)variableRange;
 
+- (BOOL)updateDynamicVariableAddress:(ZGVariable *)variable;
+
 - (void)clearCache;
 
 - (void)cleanUp;
 
 @end
+
+NS_ASSUME_NONNULL_END

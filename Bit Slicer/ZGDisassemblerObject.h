@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 1/12/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,18 +34,22 @@
 #import "ZGMemoryTypes.h"
 #import "ZGInstruction.h"
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface ZGDisassemblerObject : NSObject
 
 + (BOOL)isCallMnemonic:(int)mnemonic;
 + (BOOL)isJumpMnemonic:(int)mnemonic;
 
-- (id)initWithBytes:(const void *)bytes address:(ZGMemoryAddress)address size:(ZGMemorySize)size pointerSize:(ZGMemorySize)pointerSize;
+- (nullable id)initWithBytes:(const void *)bytes address:(ZGMemoryAddress)address size:(ZGMemorySize)size pointerSize:(ZGMemorySize)pointerSize;
 
 @property (readonly, nonatomic) void *bytes;
 
 // These methods may advance the object's internal position for disassembling instructions
-- (NSArray *)readInstructions;
-- (ZGInstruction *)readLastInstructionWithMaxSize:(ZGMemorySize)maxSize;
-- (NSString *)readBranchOperand;
+- (NSArray<ZGInstruction *> *)readInstructions;
+- (nullable ZGInstruction *)readLastInstructionWithMaxSize:(ZGMemorySize)maxSize;
+- (nullable NSString *)readBranchOperand;
 
 @end
+
+NS_ASSUME_NONNULL_END

@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 10/25/09.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,8 +30,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _ZG_VIRTUAL_MEMORY_H
-#define _ZG_VIRTUAL_MEMORY_H
+#ifndef ZG_VIRTUAL_MEMORY_H
+#define ZG_VIRTUAL_MEMORY_H
 
 #ifdef __cplusplus
 extern "C" {

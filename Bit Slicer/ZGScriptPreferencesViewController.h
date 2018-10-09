@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 4/28/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,6 +32,10 @@
 
 #import <Cocoa/Cocoa.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface ZGScriptPreferencesViewController : NSViewController
 
 @end
+
+NS_ASSUME_NONNULL_END

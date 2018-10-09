@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 9/6/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,47 +31,38 @@
  */
 
 #import <XCTest/XCTest.h>
+
 #import "ZGVirtualMemory.h"
 #import "ZGSearchFunctions.h"
 #import "ZGSearchData.h"
 #import "ZGSearchResults.h"
 #import "ZGStoredData.h"
-#import "ZGUtilities.h"
+#import "ZGDataValueExtracting.h"
 
 @interface SearchVirtualMemoryTest : XCTestCase
+
+@end
+
+@implementation SearchVirtualMemoryTest
 {
-	NSTask *_task;
 	ZGMemoryMap _processTask;
 	NSData *_data;
 	ZGMemorySize _pageSize;
 }
 
-@end
-
-@implementation SearchVirtualMemoryTest
-
 - (void)setUp
 {
     [super setUp];
 	
-    // Put setup code here. This method is called before the invocation of each test method in the class.
+	NSBundle *bundle = [NSBundle bundleForClass:[self class]];
+	NSString *randomDataPath = [bundle pathForResource:@"random_data" ofType:@""];
+	XCTAssertNotNil(randomDataPath);
 	
-	_data = [NSData dataWithContentsOfFile:[[NSBundle bundleForClass:[self class]] pathForResource:@"random_data" ofType:@""]];
+	_data = [NSData dataWithContentsOfFile:randomDataPath];
 	XCTAssertNotNil(_data);
 	
-	NSString *taskPath = @"/usr/bin/man";
-	if (![[NSFileManager defaultManager] fileExistsAtPath:taskPath])
-	{
-		XCTFail(@"%@ does not exist", taskPath);
-	}
-	
-	_task = [[NSTask alloc] init];
-	_task.launchPath = taskPath;
-	_task.arguments = @[@"man"];
-	_task.standardInput = [NSFileHandle fileHandleWithNullDevice];
-	[_task launch];
-	
-	if (!ZGTaskForPID(_task.processIdentifier, &_processTask))
+	// We'll use our own process because it's a pain to use another one
+	if (!ZGTaskForPID(getpid(), &_processTask))
 	{
 		XCTFail(@"Failed to grant access to task");
 	}
@@ -126,7 +115,6 @@
 {
     // Put teardown code here. This method is called after the invocation of each test method in the class.
 	ZGDeallocatePort(_processTask);
-	[_task terminate];
 	
     [super tearDown];
 }
@@ -160,7 +148,7 @@
 	XCTAssertTrue(foundAddress);
 }
 
-- (ZGSearchData *)searchDataFromBytes:(void *)bytes size:(ZGMemorySize)size address:(ZGMemoryAddress)address alignment:(ZGMemorySize)alignment
+- (ZGSearchData *)searchDataFromBytes:(const void *)bytes size:(ZGMemorySize)size address:(ZGMemoryAddress)address alignment:(ZGMemorySize)alignment
 {
 	void *copiedBytes = malloc(size);
 	if (copiedBytes == NULL)
@@ -400,12 +388,12 @@
 	ZGMemoryAddress address = [self allocateDataIntoProcess];
 	float value = -0.036687f;
 	ZGSearchData *searchData = [self searchDataFromBytes:&value size:sizeof(value) address:address alignment:sizeof(value)];
-	searchData.epsilon = 0.0000001f;
+	searchData.epsilon = 0.0000001;
 	
 	ZGSearchResults *results = ZGSearchForData(_processTask, searchData, nil, ZGFloat, 0, ZGEquals);
 	XCTAssertEqual(results.addressCount, 1U);
 	
-	searchData.epsilon = 0.01f;
+	searchData.epsilon = 0.01;
 	ZGSearchResults *resultsWithBigEpsilon = ZGSearchForData(_processTask, searchData, nil, ZGFloat, 0, ZGEquals);
 	XCTAssertEqual(resultsWithBigEpsilon.addressCount, 5U);
 	
@@ -419,7 +407,7 @@
 	ZGSearchResults *bigEndianResults = ZGSearchForData(_processTask, searchData, nil, ZGFloat, 0, ZGEquals);
 	XCTAssertEqual(bigEndianResults.addressCount, 1U);
 	
-	searchData.epsilon = 100.0f;
+	searchData.epsilon = 100.0;
 	ZGSearchResults *bigEndianResultsWithBigEpsilon = ZGSearchForData(_processTask, searchData, nil, ZGFloat, 0, ZGEquals);
 	XCTAssertEqual(bigEndianResultsWithBigEpsilon.addressCount, 2U);
 }
@@ -541,7 +529,7 @@
 	size_t mooLength = strlen("moo") * 2;
 	if (!ZGWriteBytes(_processTask, address + 5000, moo, mooLength)) XCTFail(@"Failed to write moo string");
 	
-	ZGSearchData *mooSearchData = [self searchDataFromBytes:(void *)moo size:mooLength address:address alignment:2];
+	ZGSearchData *mooSearchData = [self searchDataFromBytes:moo size:mooLength address:address alignment:2];
 	
 	ZGSearchResults *equalNarrowedResults = ZGNarrowSearchForData(_processTask, mooSearchData, nil, ZGString16, 0, ZGEquals, [[ZGSearchResults alloc] init], equalResults);
 	XCTAssertEqual(equalNarrowedResults.addressCount, 1U);
@@ -563,7 +551,7 @@
 	ZGSearchResults *notEqualNarrowedIgnoreCaseResults = ZGNarrowSearchForData(_processTask, searchData, nil, ZGString16, 0, ZGNotEquals, [[ZGSearchResults alloc] init], equalResults);
 	XCTAssertEqual(notEqualNarrowedIgnoreCaseResults.addressCount, 1U);
 	
-	ZGSearchData *nooSearchData = [self searchDataFromBytes:(void *)noo size:nooLength address:address alignment:2];
+	ZGSearchData *nooSearchData = [self searchDataFromBytes:noo size:nooLength address:address alignment:2];
 	nooSearchData.beginAddress = address + _pageSize;
 	nooSearchData.endAddress = address + _pageSize * 2;
 	

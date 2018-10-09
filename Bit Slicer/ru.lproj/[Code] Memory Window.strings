@@ -1,0 +1,8 @@
+/* Menu item for pausing the target process */
+"pauseTargetProcess" = "Приостановать Целевой Процесс";
+
+/* Menu item for unpausing the target process */
+"unpauseTargetProcess" = "Возобновить Целевой Процесс";
+
+/* Selection label name when there is no running target available to select from (i.e, user isn't running any detectable programs) */
+"noTargetAvailable" = "Нет доступных";

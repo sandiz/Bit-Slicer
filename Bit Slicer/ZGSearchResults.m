@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 3/16/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,7 +34,7 @@
 
 @implementation ZGSearchResults
 
-- (id)initWithResultSets:(NSArray *)resultSets dataSize:(ZGMemorySize)dataSize pointerSize:(ZGMemorySize)pointerSize
+- (id)initWithResultSets:(NSArray<NSData *> *)resultSets dataSize:(ZGMemorySize)dataSize pointerSize:(ZGMemorySize)pointerSize
 {
 	self = [super init];
 	if (self != nil)
@@ -59,7 +57,7 @@
 	
 	if (_addressCount == 0)
 	{
-		_resultSets = nil;
+		_resultSets = @[];
 	}
 }
 
@@ -108,15 +106,20 @@
 			const void *resultBytes = resultSet.bytes;
 			for (ZGMemorySize offset = beginOffset; offset < endOffset; offset += pointerSize)
 			{
+				ZGMemoryAddress address;
 				switch (pointerSize)
 				{
 					case sizeof(ZGMemoryAddress):
-						addressCallback(*(ZGMemoryAddress *)(resultBytes + offset), &shouldStopEnumerating);
+						address = *(const ZGMemoryAddress *)(const void *)((const uint8_t *)resultBytes + offset);
+						break;
+					case sizeof(ZG32BitMemoryAddress):
+						address = *(const ZG32BitMemoryAddress *)(const void *)((const uint8_t *)resultBytes + offset);
 						break;
 					default:
-						addressCallback(*(ZG32BitMemoryAddress *)(resultBytes + offset), &shouldStopEnumerating);
-						break;
+						assert("Retrieved unexpected pointer size" == NULL);
 				}
+				
+				addressCallback(address, &shouldStopEnumerating);
 				
 				if (shouldStopEnumerating)
 				{

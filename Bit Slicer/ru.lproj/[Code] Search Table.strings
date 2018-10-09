@@ -1,0 +1,29 @@
+/* Undo action for re-ordering variables */
+"undoMoveAction" = "Перемещение";
+
+/* Name of Script variable type */
+"scriptVariableType" = "Скрипт";
+
+/* Description label for tooltip */
+"descriptionTooltipLabel" = "Описание:";
+
+/* Dynamic address of the variable */
+"addressTooltipLabel" = "Адрес:";
+
+/* Byte size of the byte array variable */
+"byteSizeTooltipLabel" = "Размер байта:";
+
+/* Protection of page the variable is located at */
+"protectionTooltipLabel" = "Защита на:";
+
+/* Mapped user tag variable address is located at */
+"tagTooltipLabel" = "Тег:";
+
+/* Mapped file path variable address is located at */
+"mappedTooltipLabel" = "Соответствует:";
+
+/* Offset from image address is located at */
+"offsetTooltipLabel" = "Оффсет (смещение):";
+
+/* Mach segment variable address is located in */
+"segmentTooltipLabel" = "Сегмент:";

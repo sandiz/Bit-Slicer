@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 1/12/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,6 +33,8 @@
 #import <Cocoa/Cocoa.h>
 #import "ZGMemoryTypes.h"
 
+NS_ASSUME_NONNULL_BEGIN
+
 @protocol ZGBreakPointConditionDelegate <NSObject>
 
 - (void)breakPointCondition:(NSString *)condition didChangeAtAddress:(ZGMemoryAddress)address;
@@ -44,9 +44,11 @@
 
 @interface ZGBreakPointConditionViewController : NSViewController
 
-- (id)initWithDelegate:(id <ZGBreakPointConditionDelegate>)delegate;
+- (nonnull id)initWithDelegate:(nullable id <ZGBreakPointConditionDelegate>)delegate;
 
 @property (nonatomic) ZGMemoryAddress targetAddress;
-@property (nonatomic, copy) NSString *condition;
+@property (nonatomic, copy, nullable) NSString *condition;
 
 @end
+
+NS_ASSUME_NONNULL_END

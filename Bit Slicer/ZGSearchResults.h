@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 3/16/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,22 +33,23 @@
 #import <Foundation/Foundation.h>
 #import "ZGMemoryTypes.h"
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface ZGSearchResults : NSObject
 
 @property (nonatomic, readonly) ZGMemorySize addressIndex;
 @property (nonatomic, readonly) ZGMemorySize addressCount;
 @property (nonatomic, readonly) ZGMemorySize pointerSize;
 @property (nonatomic, readonly) ZGMemorySize dataSize;
-@property (nonatomic, readonly) NSArray *resultSets;
+@property (nonatomic, readonly) NSArray<NSData *> *resultSets;
 
 // User data fields
-@property (nonatomic) int dataType;
+@property (nonatomic) NSInteger dataType;
 @property (nonatomic) BOOL enabled;
-@property (nonatomic) int byteOrder;
 
 typedef void (^zg_enumerate_search_results_t)(ZGMemoryAddress address, BOOL *stop);
 
-- (id)initWithResultSets:(NSArray *)resultSets dataSize:(ZGMemorySize)dataSize pointerSize:(ZGMemorySize)pointerSize;
+- (id)initWithResultSets:(NSArray<NSData *> *)resultSets dataSize:(ZGMemorySize)dataSize pointerSize:(ZGMemorySize)pointerSize;
 
 - (void)removeNumberOfAddresses:(ZGMemorySize)numberOfAddresses;
 
@@ -58,3 +57,5 @@ typedef void (^zg_enumerate_search_results_t)(ZGMemoryAddress address, BOOL *sto
 - (void)enumerateUsingBlock:(zg_enumerate_search_results_t)addressCallback;
 
 @end
+
+NS_ASSUME_NONNULL_END

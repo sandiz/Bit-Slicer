@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 3/9/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,17 +33,23 @@
 #import <Foundation/Foundation.h>
 #import "ZGMemoryTypes.h"
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface ZGRegion : NSObject
 {
 @public
+	// For fast access
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wobjc-interface-ivars"
 	ZGMemoryAddress _address;
 	ZGMemorySize _size;
-	void *_bytes;
+	void * _Nullable _bytes;
+#pragma clang diagnostic pop
 }
 
-+ (NSArray *)regionsFromProcessTask:(ZGMemoryMap)processTask;
-+ (NSArray *)submapRegionsFromProcessTask:(ZGMemoryMap)processTask;
-+ (NSArray *)submapRegionsFromProcessTask:(ZGMemoryMap)processTask region:(ZGRegion *)region;
++ (NSArray<ZGRegion *> *)regionsFromProcessTask:(ZGMemoryMap)processTask;
++ (NSArray<ZGRegion *> *)submapRegionsFromProcessTask:(ZGMemoryMap)processTask;
++ (NSArray<ZGRegion *> *)submapRegionsFromProcessTask:(ZGMemoryMap)processTask region:(ZGRegion *)region;
 
 - (id)initWithAddress:(ZGMemoryAddress)address size:(ZGMemorySize)size protection:(ZGMemoryProtection)protection;
 - (id)initWithAddress:(ZGMemoryAddress)address size:(ZGMemorySize)size;
@@ -53,6 +57,8 @@
 @property (nonatomic, readonly) ZGMemoryAddress address;
 @property (nonatomic, readonly) ZGMemorySize size;
 @property (nonatomic, readonly) ZGMemoryProtection protection;
-@property (nonatomic, readonly) void *bytes;
+@property (nonatomic, readonly, nullable) void *bytes;
 
 @end
+
+NS_ASSUME_NONNULL_END

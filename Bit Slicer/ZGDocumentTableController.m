@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 7/21/12.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,27 +41,27 @@
 #import "ZGSearchProgress.h"
 #import "ZGSearchResults.h"
 #import "ZGVirtualMemory.h"
-#import "ZGVirtualMemoryHelpers.h"
+#import "ZGVirtualMemoryUserTags.h"
+#import "ZGVirtualMemoryStringReading.h"
 #import "ZGMachBinary.h"
 #import "ZGMachBinaryInfo.h"
 #import "ZGDocumentData.h"
 #import "ZGDocumentWindowController.h"
 #import "ZGScriptManager.h"
-#import "ZGUtilities.h"
 #import "ZGTableView.h"
 #import "NSArrayAdditions.h"
-
-@interface ZGDocumentTableController ()
-
-@property (assign, nonatomic) ZGDocumentWindowController *windowController;
-@property (nonatomic, assign) ZGDocumentData *documentData;
-@property (nonatomic) NSTimer *watchVariablesTimer;
-@property (nonatomic) NSMutableArray *failedExecutableImages;
-@property (nonatomic) NSDate *lastUpdatedDate;
-
-@end
+#import "ZGProtectionDescription.h"
+#import "ZGNullability.h"
 
 @implementation ZGDocumentTableController
+{
+	__weak ZGDocumentWindowController * _Nullable _windowController;
+	NSTimer * _Nullable _watchVariablesTimer;
+	NSMutableArray<NSString *> * _Nonnull _failedExecutableImages;
+	NSDate * _Nullable _lastUpdatedDate;
+	ZGDocumentData * _Nonnull _documentData;
+	ZGTableView * _Nullable _variablesTableView;
+}
 
 #define ZGVariableReorderType @"ZGVariableReorderType"
 
@@ -76,12 +74,13 @@
 - (id)initWithWindowController:(ZGDocumentWindowController *)windowController
 {
 	self = [super init];
-	if (self)
+	if (self != nil)
 	{
-		self.windowController = windowController;
-		self.documentData = windowController.documentData;
+		_windowController = windowController;
+		_documentData = windowController.documentData;
 		
-		self.failedExecutableImages = [[NSMutableArray alloc] init];
+		_failedExecutableImages = [[NSMutableArray alloc] init];
+		[self setVariablesTableView:windowController.variablesTableView];
 	}
 	return self;
 }
@@ -89,9 +88,8 @@
 - (void)setVariablesTableView:(ZGTableView *)tableView
 {
 	_variablesTableView = tableView;
-	__unsafe_unretained id selfReference = self;
-	[_variablesTableView setDataSource:selfReference];
-	[_variablesTableView setDelegate:selfReference];
+	[_variablesTableView setDataSource:self];
+	[_variablesTableView setDelegate:self];
 	[_variablesTableView registerForDraggedTypes:@[ZGVariableReorderType, ZGVariablePboardType]];
 }
 
@@ -99,26 +97,31 @@
 {
 	[[NSNotificationCenter defaultCenter] removeObserver:self];
 	
-	[self.watchVariablesTimer invalidate];
-	self.watchVariablesTimer = nil;
+	[_watchVariablesTimer invalidate];
+	_watchVariablesTimer = nil;
 	
-	self.windowController = nil;
-	self.variablesTableView = nil;
+	_windowController = nil;
+	[self setVariablesTableView:nil];
 }
 
 #pragma mark Updating Table
 
 - (BOOL)updateWatchVariablesTimer
 {
-	ZGDocumentWindowController *windowController = self.windowController;
+	ZGDocumentWindowController *windowController = _windowController;
+	if (windowController == nil)
+	{
+		return NO;
+	}
+	
 	ZGProcess *process = windowController.currentProcess;
 	
-	BOOL hasVariablesThatNeedUpdating = process.valid && process.hasGrantedAccess && [self.documentData.variables zgHasObjectMatchingCondition:^(ZGVariable *variable) { return (BOOL)(variable.type != ZGScript); }];
-	BOOL shouldHaveTimer = hasVariablesThatNeedUpdating && (!windowController.isOccluded || [self.documentData.variables zgHasObjectMatchingCondition:^(ZGVariable *variable) { return (BOOL)(variable.isFrozen && variable.enabled); }]);
+	BOOL hasVariablesThatNeedUpdating = process.valid && process.hasGrantedAccess && [_documentData.variables zgHasObjectMatchingCondition:^(ZGVariable *variable) { return (BOOL)(variable.type != ZGScript); }];
+	BOOL shouldHaveTimer = hasVariablesThatNeedUpdating && (!windowController.isOccluded || [_documentData.variables zgHasObjectMatchingCondition:^(ZGVariable *variable) { return (BOOL)(variable.isFrozen && variable.enabled); }]);
 	
-	if (shouldHaveTimer && self.watchVariablesTimer == nil)
+	if (shouldHaveTimer && _watchVariablesTimer == nil)
 	{
-		self.watchVariablesTimer =
+		_watchVariablesTimer =
 		[NSTimer
 		 scheduledTimerWithTimeInterval:WATCH_VARIABLES_UPDATE_TIME_INTERVAL
 		 target:self
@@ -126,10 +129,10 @@
 		 userInfo:nil
 		 repeats:YES];
 	}
-	else if (!shouldHaveTimer && self.watchVariablesTimer != nil)
+	else if (!shouldHaveTimer && _watchVariablesTimer != nil)
 	{
-		[self.watchVariablesTimer invalidate];
-		self.watchVariablesTimer = nil;
+		[_watchVariablesTimer invalidate];
+		_watchVariablesTimer = nil;
 	}
 	
 	return shouldHaveTimer;
@@ -137,11 +140,17 @@
 
 - (BOOL)updateVariableValuesInRange:(NSRange)variableRange
 {
-	ZGProcess *currentProcess = self.windowController.currentProcess;
-	BOOL needsToReloadTable = NO;
-	if (variableRange.location + variableRange.length <= self.documentData.variables.count)
+	ZGDocumentWindowController *windowController = _windowController;
+	if (windowController == nil)
 	{
-		for (ZGVariable *variable in [self.documentData.variables subarrayWithRange:variableRange])
+		return NO;
+	}
+	
+	ZGProcess *currentProcess = windowController.currentProcess;
+	BOOL needsToReloadTable = NO;
+	if (variableRange.location + variableRange.length <= _documentData.variables.count)
+	{
+		for (ZGVariable *variable in [_documentData.variables subarrayWithRange:variableRange])
 		{
 			NSString *oldStringValue = [variable.stringValue copy];
 			if (!(variable.isFrozen && variable.freezeValue) && (variable.type == ZGString8 || variable.type == ZGString16))
@@ -184,21 +193,22 @@
 
 - (void)clearCache
 {
-	[self.failedExecutableImages removeAllObjects];
-	self.lastUpdatedDate = [NSDate date];
+	[_failedExecutableImages removeAllObjects];
+	_lastUpdatedDate = [NSDate date];
 }
 
 - (BOOL)updateDynamicVariableAddress:(ZGVariable *)variable
 {
 	BOOL needsToReload = NO;
-	if (variable.usesDynamicAddress && !variable.finishedEvaluatingDynamicAddress)
+	ZGDocumentWindowController *windowController = _windowController;
+	if (windowController != nil && variable.usesDynamicAddress && !variable.finishedEvaluatingDynamicAddress)
 	{
 		NSError *error = nil;
 		NSString *newAddressString =
 			[ZGCalculator
 			 evaluateExpression:[NSMutableString stringWithString:variable.addressFormula]
-			 process:self.windowController.currentProcess
-			 failedImages:self.failedExecutableImages
+			 process:windowController.currentProcess
+			 failedImages:_failedExecutableImages
 			 error:&error];
 		
 		if (variable.address != newAddressString.zgUnsignedLongLongValue)
@@ -218,16 +228,21 @@
 
 - (void)updateWatchVariablesTable:(NSTimer *)__unused timer
 {
+	ZGDocumentWindowController *windowController = _windowController;
+	if (windowController == nil)
+	{
+		return;
+	}
+	
 	BOOL needsToReloadTable = NO;
-	ZGDocumentWindowController *windowController = self.windowController;
 	BOOL isOccluded = windowController.isOccluded;
-	NSRange visibleRowsRange;
+	NSRange visibleRowsRange = {};
 	
 	if (!isOccluded)
 	{
-		visibleRowsRange = [self.variablesTableView rowsInRect:self.variablesTableView.visibleRect];
+		visibleRowsRange = [_variablesTableView rowsInRect:_variablesTableView.visibleRect];
 		
-		if (windowController.searchController.canStartTask && windowController.searchController.searchResults.addressCount > 0 && visibleRowsRange.location + visibleRowsRange.length >= self.documentData.variables.count)
+		if (windowController.searchController.canStartTask && windowController.searchController.searchResults.addressCount > 0 && visibleRowsRange.location + visibleRowsRange.length >= _documentData.variables.count)
 		{
 			[windowController.searchController fetchNumberOfVariables:MAX_NUMBER_OF_VARIABLES_TO_FETCH];
 			needsToReloadTable = YES;
@@ -235,16 +250,16 @@
 	}
 	
 	// Don't look up executable images that have been known to fail frequently, otherwise it'd be a serious penalty cost
-	if (windowController.currentProcess.hasGrantedAccess && self.failedExecutableImages.count > 0 && (self.lastUpdatedDate == nil || [[NSDate date] timeIntervalSinceDate:self.lastUpdatedDate] > 5.0))
+	if (windowController.currentProcess.hasGrantedAccess && _failedExecutableImages.count > 0 && (_lastUpdatedDate == nil || [[NSDate date] timeIntervalSinceDate:(NSDate * _Nonnull)_lastUpdatedDate] > 5.0))
 	{
 		[self clearCache];
 	}
 	
 	// First, update all the variables that have dynamic addresses
 	// We don't want to update this when the user is editing something in the table
-	if (!isOccluded && windowController.currentProcess.hasGrantedAccess && self.variablesTableView.editedRow == -1)
+	if (!isOccluded && windowController.currentProcess.hasGrantedAccess && _variablesTableView.editedRow == -1)
 	{
-		for (ZGVariable *variable in [self.documentData.variables subarrayWithRange:visibleRowsRange])
+		for (ZGVariable *variable in [_documentData.variables subarrayWithRange:visibleRowsRange])
 		{
 			if ([self updateDynamicVariableAddress:variable])
 			{
@@ -258,7 +273,7 @@
 	{
 		// Freeze all variables that need be frozen!
 		NSUInteger variableIndex = 0;
-		for (ZGVariable *variable in self.documentData.variables)
+		for (ZGVariable *variable in _documentData.variables)
 		{
 			if (variable.enabled && variable.isFrozen && variable.freezeValue != NULL)
 			{
@@ -294,7 +309,7 @@
 	{
 		// if any variables are changing, that means that we'll have to reload the table, and that'd be very bad
 		// if the user is in the process of editing a variable's value, so don't do it then
-		if (windowController.currentProcess.hasGrantedAccess && self.variablesTableView.editedRow == -1)
+		if (windowController.currentProcess.hasGrantedAccess && _variablesTableView.editedRow == -1)
 		{
 			// Read all the variables and update them in the table view if needed
 			if ([self updateVariableValuesInRange:visibleRowsRange])
@@ -305,7 +320,7 @@
 		
 		if (needsToReloadTable)
 		{
-			[self.variablesTableView reloadData];
+			[_variablesTableView reloadData];
 		}
 	}
 }
@@ -314,7 +329,7 @@
 
 - (NSDragOperation)tableView:(NSTableView *)__unused tableView validateDrop:(id <NSDraggingInfo>)draggingInfo proposedRow:(NSInteger)__unused row proposedDropOperation:(NSTableViewDropOperation)operation
 {
-	if ([draggingInfo draggingSource] == self.variablesTableView && [draggingInfo.draggingPasteboard.types containsObject:ZGVariableReorderType] && operation != NSTableViewDropOn)
+	if ([draggingInfo draggingSource] == _variablesTableView && [draggingInfo.draggingPasteboard.types containsObject:ZGVariableReorderType] && operation != NSTableViewDropOn)
 	{
 		return NSDragOperationMove;
 	}
@@ -326,15 +341,16 @@
 	return NSDragOperationNone;
 }
 
-- (void)reorderVariables:(NSArray *)newVariables
+- (void)reorderVariables:(NSArray<ZGVariable *> *)newVariables
 {
-	NSUndoManager *undoManager = self.windowController.undoManager;
+	ZGDocumentWindowController *windowController = _windowController;
+	NSUndoManager *undoManager = windowController.undoManager;
 	undoManager.actionName = ZGLocalizableSearchTableString(@"undoMoveAction");
-	[[undoManager prepareWithInvocationTarget:self] reorderVariables:self.documentData.variables];
+	[(ZGDocumentTableController *)[undoManager prepareWithInvocationTarget:self] reorderVariables:_documentData.variables];
 	
-	self.documentData.variables = [NSArray arrayWithArray:newVariables];
+	_documentData.variables = [NSArray arrayWithArray:newVariables];
 	
-	[self.variablesTableView reloadData];
+	[_variablesTableView reloadData];
 }
 
 - (BOOL)tableView:(NSTableView *)__unused tableView acceptDrop:(id <NSDraggingInfo>)draggingInfo row:(NSInteger)newRow dropOperation:(NSTableViewDropOperation)__unused operation
@@ -344,38 +360,38 @@
 		return NO;
 	}
 	
-	if ([draggingInfo draggingSource] == self.variablesTableView && [draggingInfo.draggingPasteboard.types containsObject:ZGVariableReorderType])
+	if ([draggingInfo draggingSource] == _variablesTableView && [draggingInfo.draggingPasteboard.types containsObject:ZGVariableReorderType])
 	{
-		NSMutableArray *variables = [NSMutableArray arrayWithArray:self.documentData.variables];
-		NSArray *rows = [draggingInfo.draggingPasteboard propertyListForType:ZGVariableReorderType];
+		NSMutableArray<ZGVariable *> *variables = [NSMutableArray arrayWithArray:_documentData.variables];
+		NSArray<NSNumber *> *rows = [draggingInfo.draggingPasteboard propertyListForType:ZGVariableReorderType];
 		
 		// Fill in the current rows with null objects
 		for (NSNumber *row in rows)
 		{
 			[variables
 			 replaceObjectAtIndex:row.unsignedIntegerValue
-			 withObject:NSNull.null];
+			 withObject:(id)[NSNull null]];
 		}
 		
 		// Insert the objects to the new position
 		for (NSNumber *row in rows)
 		{
 			[variables
-			 insertObject:[self.documentData.variables objectAtIndex:row.unsignedIntegerValue]
+			 insertObject:[_documentData.variables objectAtIndex:row.unsignedIntegerValue]
 			 atIndex:(NSUInteger)newRow];
 			
 			newRow++;
 		}
 		
 		// Remove all the old objects
-		[variables removeObject:NSNull.null];
+		[variables removeObject:(id)[NSNull null]];
 		
 		// Set the new variables
 		[self reorderVariables:variables];
 	}
 	else if ([draggingInfo.draggingPasteboard.types containsObject:ZGVariablePboardType])
 	{
-		NSArray *variables = [NSKeyedUnarchiver unarchiveObjectWithData:[[draggingInfo draggingPasteboard] dataForType:ZGVariablePboardType]];
+		NSArray<ZGVariable *> *variables = [NSKeyedUnarchiver unarchiveObjectWithData:ZGUnwrapNullableObject([[draggingInfo draggingPasteboard] dataForType:ZGVariablePboardType])];
 		
 		NSMutableIndexSet *rowIndexes = [NSMutableIndexSet indexSet];
 		for (NSUInteger rowIndex = 0; rowIndex < variables.count; rowIndex++)
@@ -383,7 +399,8 @@
 			[rowIndexes addIndex:(NSUInteger)newRow + rowIndex];
 		}
 		
-		[self.windowController.variableController addVariables:variables atRowIndexes:rowIndexes];
+		ZGDocumentWindowController *windowController = _windowController;
+		[windowController.variableController addVariables:variables atRowIndexes:rowIndexes];
 	}
 	
 	return YES;
@@ -393,13 +410,13 @@
 {
 	[pasteboard declareTypes:@[ZGVariableReorderType, ZGVariablePboardType] owner:self];
 	
-	NSMutableArray *rows = [[NSMutableArray alloc] init];
+	NSMutableArray<NSNumber *> *rows = [[NSMutableArray alloc] init];
 	[rowIndexes enumerateIndexesUsingBlock:^(NSUInteger index, BOOL * __unused stop) {
 		[rows addObject:@(index)];
 	}];
 	[pasteboard  setPropertyList:[NSArray arrayWithArray:rows] forType:ZGVariableReorderType];
 	
-	NSArray *variables = [self.documentData.variables objectsAtIndexes:rowIndexes];
+	NSArray<ZGVariable *> *variables = [_documentData.variables objectsAtIndexes:rowIndexes];
 	[pasteboard setData:[NSKeyedArchiver archivedDataWithRootObject:variables] forType:ZGVariablePboardType];
 	
 	return YES;
@@ -411,7 +428,7 @@
 {
 	if ([tableColumn.identifier isEqualToString:@"type"] && row >= 0)
 	{
-		ZGVariable *variable = [self.documentData.variables objectAtIndex:(NSUInteger)row];
+		ZGVariable *variable = [_documentData.variables objectAtIndex:(NSUInteger)row];
 		if (variable.type == ZGScript)
 		{
 			// value data cell will do since it's a NSTextFieldCell
@@ -424,9 +441,9 @@
 
 - (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)rowIndex
 {
-	if (tableView == self.variablesTableView && rowIndex >= 0 && (NSUInteger)rowIndex < self.documentData.variables.count)
+	if (tableView == _variablesTableView && rowIndex >= 0 && (NSUInteger)rowIndex < _documentData.variables.count)
 	{
-		ZGVariable *variable = [self.documentData.variables objectAtIndex:(NSUInteger)rowIndex];
+		ZGVariable *variable = [_documentData.variables objectAtIndex:(NSUInteger)rowIndex];
 		if ([tableColumn.identifier isEqualToString:@"description"])
 		{
 			return variable.shortDescription;
@@ -442,7 +459,7 @@
 		{
 			if (variable.type == ZGScript)
 			{
-				NSArray *lines = [variable.scriptValue componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+				NSArray<NSString *> *lines = [variable.scriptValue componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
 				if (lines.count > 0)
 				{
 					return [lines objectAtIndex:0];
@@ -452,13 +469,14 @@
 		}
 		else if ([tableColumn.identifier isEqualToString:@"enabled"])
 		{
-			[[tableColumn dataCellForRow:rowIndex] setEnabled:self.windowController.currentProcess.valid];
+			ZGDocumentWindowController *windowController = _windowController;
+			[(NSControl *)[tableColumn dataCellForRow:rowIndex] setEnabled:windowController.currentProcess.valid];
 			return @(variable.enabled);
 		}
 		else if ([tableColumn.identifier isEqualToString:@"type"])
 		{
 			// Using a space to align the text field cell with the popup button cell
-			return variable.type == ZGScript ? [@" " stringByAppendingString:ZGLocalizableSearchTableString(@"scriptVariableType")] : @([tableColumn.dataCell indexOfItemWithTag:variable.type]);
+			return variable.type == ZGScript ? [@" " stringByAppendingString:ZGLocalizableSearchTableString(@"scriptVariableType")] : @([(NSPopUpButtonCell *)tableColumn.dataCell indexOfItemWithTag:variable.type]);
 		}
 	}
 	
@@ -467,10 +485,10 @@
 
 - (void)tableView:(NSTableView *)tableView setObjectValue:(id)object forTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)rowIndex
 {
-	if (tableView == self.variablesTableView && rowIndex >= 0 && (NSUInteger)rowIndex < self.documentData.variables.count)
+	if (tableView == _variablesTableView && rowIndex >= 0 && (NSUInteger)rowIndex < _documentData.variables.count)
 	{
-		ZGDocumentWindowController *windowController = self.windowController;
-		ZGVariable *variable = [self.documentData.variables objectAtIndex:(NSUInteger)rowIndex];
+		ZGDocumentWindowController *windowController = _windowController;
+		ZGVariable *variable = [_documentData.variables objectAtIndex:(NSUInteger)rowIndex];
 		if ([tableColumn.identifier isEqualToString:@"value"])
 		{
 			[windowController.variableController
@@ -481,14 +499,14 @@
 		else if ([tableColumn.identifier isEqualToString:@"enabled"])
 		{
 			[windowController.variableController
-			 changeVariableEnabled:[object boolValue]
+			 changeVariableEnabled:[(NSNumber *)object boolValue]
 			 rowIndexes:windowController.selectedVariableIndexes];
 		}
 		else if ([tableColumn.identifier isEqualToString:@"type"])
 		{
 			[windowController.variableController
 			 changeVariable:variable
-			 newType:(ZGVariableType)[[[tableColumn.dataCell itemArray] objectAtIndex:[object unsignedIntegerValue]] tag]
+			 newType:(ZGVariableType)[[[(NSPopUpButtonCell *)tableColumn.dataCell itemArray] objectAtIndex:[(NSNumber *)object unsignedIntegerValue]] tag]
 			 newSize:variable.size];
 		}
 	}
@@ -496,7 +514,7 @@
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)__unused tableView
 {
-	return (NSInteger)self.documentData.variables.count;
+	return (NSInteger)_documentData.variables.count;
 }
 
 #pragma mark Table View Delegate Methods
@@ -504,14 +522,14 @@
 - (BOOL)tableView:(NSTableView *)aTableView shouldEditTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)rowIndex
 {
 	ZGTableView *tableView = (ZGTableView *)aTableView;
-	if (rowIndex < 0 || (NSUInteger)rowIndex >= self.documentData.variables.count)
+	if (rowIndex < 0 || (NSUInteger)rowIndex >= _documentData.variables.count)
 	{
 		return NO;
 	}
 	
-	ZGDocumentWindowController *windowController = self.windowController;
+	ZGDocumentWindowController *windowController = _windowController;
 	
-	ZGVariable *variable = [self.documentData.variables objectAtIndex:(NSUInteger)rowIndex];
+	ZGVariable *variable = [_documentData.variables objectAtIndex:(NSUInteger)rowIndex];
 	
 	if ([tableColumn.identifier isEqualToString:@"value"])
 	{
@@ -580,27 +598,27 @@
 {
 	if ([tableColumn.identifier isEqualToString:@"value"])
 	{
-		if (rowIndex >= 0 && (NSUInteger)rowIndex < self.documentData.variables.count)
+		if (rowIndex >= 0 && (NSUInteger)rowIndex < _documentData.variables.count)
 		{
-			[cell setTextColor:[[self.documentData.variables objectAtIndex:(NSUInteger)rowIndex] isFrozen] ? NSColor.redColor : NSColor.textColor];
+			[(NSTextFieldCell *)cell setTextColor:[[_documentData.variables objectAtIndex:(NSUInteger)rowIndex] isFrozen] ? NSColor.systemRedColor : NSColor.controlTextColor];
 		}
 	}
 }
 
 - (NSString *)tableView:(NSTableView *)__unused aTableView toolTipForCell:(NSCell *)__unused aCell rect:(NSRectPointer)__unused rect tableColumn:(NSTableColumn *)__unused aTableColumn row:(NSInteger)row mouseLocation:(NSPoint)__unused mouseLocation
 {
-	NSMutableArray *displayComponents = [[NSMutableArray alloc] init];
+	NSMutableArray<NSString *> *displayComponents = [[NSMutableArray alloc] init];
 	
-	if (row >= 0 && (NSUInteger)row < self.documentData.variables.count)
+	if (row >= 0 && (NSUInteger)row < _documentData.variables.count)
 	{
-		ZGVariable *variable = [self.documentData.variables objectAtIndex:(NSUInteger)row];
+		ZGVariable *variable = [_documentData.variables objectAtIndex:(NSUInteger)row];
 		
 		NSString *fullDescription = variable.fullAttributedDescription.string;
 		NSUInteger fullDescriptionLength = fullDescription.length;
 		if (variable.name.length < fullDescriptionLength)
 		{
-			NSArray *lines = [fullDescription componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
-			NSArray *trimmedLines = [lines subarrayWithRange:NSMakeRange(0, MIN(lines.count, 6U))];
+			NSArray<NSString *> *lines = [fullDescription componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+			NSArray<NSString *> *trimmedLines = [lines subarrayWithRange:NSMakeRange(0, MIN(lines.count, 6U))];
 			NSString *descriptionFromTrimmedLines = [trimmedLines componentsJoinedByString:@"\n"];
 			NSString *trimmedDescription = [descriptionFromTrimmedLines substringWithRange:NSMakeRange(0, MIN(descriptionFromTrimmedLines.length, 100U))];
 			if (trimmedDescription.length < fullDescriptionLength)
@@ -623,7 +641,8 @@
 			[displayComponents addObject:[NSString stringWithFormat:@"%@ %@", ZGLocalizableSearchTableString(@"byteSizeTooltipLabel"), variable.sizeStringValue]];
 		}
 		
-		ZGProcess *currentProcess = self.windowController.currentProcess;
+		ZGDocumentWindowController *windowController = _windowController;
+		ZGProcess *currentProcess = windowController.currentProcess;
 		if (variable.type != ZGScript && currentProcess.valid)
 		{
 			ZGMemoryAddress memoryProtectionAddress = variable.address;

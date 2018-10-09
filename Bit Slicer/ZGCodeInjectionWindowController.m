@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 8/19/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,22 +37,20 @@
 #import "ZGDebuggerUtilities.h"
 #import "ZGInstruction.h"
 #import "ZGVariable.h"
-#import "ZGUtilities.h"
-
-@interface ZGCodeInjectionWindowController ()
-
-@property (assign, nonatomic) IBOutlet NSTextView *textView;
-@property (nonatomic, copy) NSString *suggestedCode;
-@property (nonatomic) NSUndoManager *undoManager;
-@property (nonatomic) ZGMemoryAddress allocatedAddress;
-@property (nonatomic) ZGMemorySize numberOfAllocatedBytes;
-@property (nonatomic) ZGProcess *process;
-@property (nonatomic) NSArray *instructions;
-@property (nonatomic) NSArray *breakPoints;
-
-@end
+#import "ZGRunAlertPanel.h"
+#import "ZGNullability.h"
 
 @implementation ZGCodeInjectionWindowController
+{
+	IBOutlet NSTextView *_textView;
+	NSString * _Nullable _suggestedCode;
+	NSUndoManager * _Nullable _undoManager;
+	ZGMemoryAddress _allocatedAddress;
+	ZGMemorySize _numberOfAllocatedBytes;
+	ZGProcess * _Nullable _process;
+	NSArray<ZGInstruction *> *_instructions;
+	NSArray<ZGBreakPoint *> *_breakPoints;
+}
 
 - (NSString *)windowNibName
 {
@@ -64,15 +60,16 @@
 - (void)setSuggestedCode:(NSString *)suggestedCode
 {
 	_suggestedCode = [suggestedCode copy];
-	[self.textView.textStorage.mutableString setString:_suggestedCode];
+	[_textView.textStorage.mutableString setString:suggestedCode];
+	[_textView.textStorage setForegroundColor:[NSColor textColor]];
 }
 
 - (void)updateSuggestedCode
 {
-	_suggestedCode = [self.textView.textStorage.mutableString copy];
+	_suggestedCode = [_textView.textStorage.mutableString copy];
 }
 
-- (void)attachToWindow:(NSWindow *)parentWindow process:(ZGProcess *)process instruction:(ZGInstruction *)instruction breakPoints:(NSArray *)breakPoints undoManager:(NSUndoManager *)undoManager
+- (void)attachToWindow:(NSWindow *)parentWindow process:(ZGProcess *)process instruction:(ZGInstruction *)instruction breakPoints:(NSArray<ZGBreakPoint *> *)breakPoints undoManager:(NSUndoManager *)undoManager
 {
 	ZGMemoryAddress allocatedAddress = 0;
 	ZGMemorySize numberOfAllocatedBytes = NSPageSize(); // sane default
@@ -93,7 +90,7 @@
 	}
 	free(nopBuffer);
 	
-	NSArray *instructions = [ZGDebuggerUtilities instructionsBeforeHookingIntoAddress:instruction.variable.address injectingIntoDestination:allocatedAddress inProcess:process withBreakPoints:breakPoints];
+	NSArray<ZGInstruction *> *instructions = [ZGDebuggerUtilities instructionsBeforeHookingIntoAddress:instruction.variable.address injectingIntoDestination:allocatedAddress inProcess:process withBreakPoints:breakPoints];
 	
 	if (instructions == nil)
 	{
@@ -131,22 +128,19 @@
 		[suggestedCode appendString:@"\n"];
 	}
 	
-	[self window]; // Ensure window is loaded
+	NSWindow *window = ZGUnwrapNullableObject([self window]); // Ensure window is loaded
 	
-	self.suggestedCode = suggestedCode;
-	self.undoManager = undoManager;
-	self.process = process;
-	self.allocatedAddress = allocatedAddress;
-	self.numberOfAllocatedBytes = numberOfAllocatedBytes;
-	self.instructions = instructions;
-	self.breakPoints = breakPoints;
+	[self setSuggestedCode:suggestedCode];
 	
-	[NSApp
-	 beginSheet:self.window
-	 modalForWindow:parentWindow
-	 modalDelegate:nil
-	 didEndSelector:nil
-	 contextInfo:NULL];
+	_undoManager = undoManager;
+	_process = process;
+	_allocatedAddress = allocatedAddress;
+	_numberOfAllocatedBytes = numberOfAllocatedBytes;
+	_instructions = instructions;
+	_breakPoints = breakPoints;
+	
+	[parentWindow beginSheet:window completionHandler:^(NSModalResponse __unused returnCode) {
+	}];
 }
 
 - (IBAction)injectCode:(id)__unused sender
@@ -154,36 +148,33 @@
 	[self updateSuggestedCode];
 	
 	NSError *error = nil;
-	NSData *injectedCode = [ZGDebuggerUtilities assembleInstructionText:self.suggestedCode atInstructionPointer:self.allocatedAddress usingArchitectureBits:self.process.pointerSize*8 error:&error];
+	NSData *injectedCode = [ZGDebuggerUtilities assembleInstructionText:ZGUnwrapNullableObject(_suggestedCode) atInstructionPointer:_allocatedAddress usingArchitectureBits:_process.pointerSize * 8 error:&error];
 	
-	if (injectedCode.length == 0 || error != nil || ![ZGDebuggerUtilities injectCode:injectedCode intoAddress:self.allocatedAddress hookingIntoOriginalInstructions:self.instructions process:self.process breakPoints:self.breakPoints undoManager:self.undoManager error:&error])
+	if (injectedCode.length == 0 || error != nil || ![ZGDebuggerUtilities injectCode:injectedCode intoAddress:_allocatedAddress hookingIntoOriginalInstructions:_instructions process:ZGUnwrapNullableObject(_process) breakPoints:_breakPoints undoManager:_undoManager error:&error])
 	{
 		NSLog(@"Error while injecting code");
 		NSLog(@"%@", error);
-		
-		if (!ZGDeallocateMemory(self.process.processTask, self.allocatedAddress, self.numberOfAllocatedBytes))
-		{
-			NSLog(@"Error: Failed to deallocate VM memory after failing to inject code..");
-		}
 				
 		ZGRunAlertPanelWithOKButton(ZGLocalizedStringFromDebuggerTable(@"failedInjectCodeAlertTitle"), [NSString stringWithFormat:@"%@: %@", ZGLocalizedStringFromDebuggerTable(@"failedAssemblingForInjectingCodeMessage"), [error.userInfo objectForKey:@"reason"]]);
 	}
 	else
 	{
-		[NSApp endSheet:self.window];
-		[self.window close];
+		NSWindow *window = ZGUnwrapNullableObject(self.window);
+		[NSApp endSheet:window];
+		[window close];
 	}
 }
 
 - (IBAction)cancel:(id)__unused sender
 {
-	if (!ZGDeallocateMemory(self.process.processTask, self.allocatedAddress, self.numberOfAllocatedBytes))
+	if (!ZGDeallocateMemory(_process.processTask, _allocatedAddress, _numberOfAllocatedBytes))
 	{
 		NSLog(@"Error: Failed to deallocate VM memory after canceling from injecting code..");
 	}
 	
-	[NSApp endSheet:self.window];
-	[self.window close];
+	NSWindow *window = ZGUnwrapNullableObject(self.window);
+	[NSApp endSheet:window];
+	[window close];
 }
 
 @end

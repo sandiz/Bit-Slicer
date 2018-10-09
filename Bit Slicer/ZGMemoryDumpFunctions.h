@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 2/12/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,6 +34,12 @@
 #import "ZGSearchProgressDelegate.h"
 #import "ZGMemoryTypes.h"
 
+@class ZGProcess;
+
+NS_ASSUME_NONNULL_BEGIN
+
 #define ZGLocalizedStringFromDumpAllMemoryTable(string) NSLocalizedStringFromTable((string), @"[Code] Dump All Memory", nil)
 
-BOOL ZGDumpAllDataToDirectory(NSString *directory, ZGMemoryMap processTask, id <ZGSearchProgressDelegate> delegate);
+BOOL ZGDumpAllDataToDirectory(NSString *directory, ZGProcess *process, id <ZGSearchProgressDelegate> _Nullable delegate);
+
+NS_ASSUME_NONNULL_END

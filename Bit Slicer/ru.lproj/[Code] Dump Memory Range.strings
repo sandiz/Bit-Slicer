@@ -1,0 +1,11 @@
+/* Alert Title when dumping memory fails */
+"failedDumpingMemoryAlertTitle" = "Ошибка дампа памяти";
+
+/* Alert Message format when dumping memory fails */
+"failedDumpingMemoryAlertMessageFormat" = "Произошла ошибка при записи памяти из 0x%llX - 0x%llX на диск.";
+
+/* Alert title when user enters an invalid memory range address range */
+"invalidAddressRangeAlertTitle" = "Неверный диапазон адресов";
+
+/* Alert message when user enters an invalid memory range address range */
+"invalidAddressRangeAlertMessage" = "Пожалуйста, убедитесь в правильности ввода адресов.";

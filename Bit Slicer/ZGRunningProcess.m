@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 1/1/13.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,20 +33,19 @@
 #import "ZGRunningProcess.h"
 #import <sys/types.h>
 #import <sys/sysctl.h>
-
-@interface ZGRunningProcess ()
-
-@property (readwrite, nonatomic) pid_t processIdentifier;
-@property (readwrite, nonatomic) BOOL is64Bit;
-
-@end
+#import <libproc.h>
 
 @implementation ZGRunningProcess
 {
 	NSApplicationActivationPolicy _activationPolicy;
-	NSImage *_icon;
-	NSString *_name;
+	NSImage * _Nullable _icon;
+	NSString * _Nullable _name;
+	NSURL * _Nullable _fileURL;
 	BOOL _didFetchInfo;
+	BOOL _isGame;
+	BOOL _isThirdParty;
+	BOOL _isWebContent;
+	BOOL _hasHelpers;
 }
 
 #pragma mark Birth
@@ -58,9 +55,9 @@
 	self = [super init];
 	if (self != nil)
 	{
-		self.processIdentifier = processIdentifier;
-		self.internalName = name;
-		self.is64Bit = is64Bit;
+		_processIdentifier = processIdentifier;
+		_internalName = (name != nil) ? [name copy] : [NSString stringWithFormat:@"%d", processIdentifier];
+		_is64Bit = is64Bit;
 	}
 	return self;
 }
@@ -74,12 +71,12 @@
 
 - (BOOL)isEqual:(id)object
 {
-	return self.processIdentifier == [object processIdentifier];
+	return _processIdentifier == [(ZGRunningProcess *)object processIdentifier];
 }
 
 - (NSUInteger)hash
 {
-	return (NSUInteger)self.processIdentifier;
+	return (NSUInteger)_processIdentifier;
 }
 
 #pragma mark On-the-fly Accessors
@@ -88,18 +85,49 @@
 {
 	if (!_didFetchInfo)
 	{
-		NSRunningApplication *runningApplication = [NSRunningApplication runningApplicationWithProcessIdentifier:self.processIdentifier];
+		NSRunningApplication *runningApplication = [NSRunningApplication runningApplicationWithProcessIdentifier:_processIdentifier];
 		if (runningApplication != nil)
 		{
-			self->_activationPolicy = runningApplication.activationPolicy;
-			self->_icon = runningApplication.icon;
-			self->_name = runningApplication.localizedName;
+			_activationPolicy = runningApplication.activationPolicy;
+			_icon = runningApplication.icon;
+			_name = runningApplication.localizedName;
+			_fileURL = runningApplication.bundleURL;
+			
+			NSString *bundleIdentifier = runningApplication.bundleIdentifier;
+			_isThirdParty = ![bundleIdentifier hasPrefix:@"com.apple."];
+			_isWebContent = ([_name isEqualToString:@"Safari Web Content"] || [_name isEqualToString:@"Google Chrome Helper"] || [_name isEqualToString:@"Firefox Web Content"]);
+			_hasHelpers = [bundleIdentifier isEqualToString:@"com.apple.Safari"] || [bundleIdentifier isEqualToString:@"com.google.Chrome"];
+			
+			NSURL *applicationBundleURL = runningApplication.bundleURL;
+			if (applicationBundleURL != nil)
+			{
+				NSBundle *applicationBundle = [NSBundle bundleWithURL:applicationBundleURL];
+				if (applicationBundle != nil)
+				{
+					NSString *category = [applicationBundle objectForInfoDictionaryKey:@"LSApplicationCategoryType"];
+					if ([category isKindOfClass:[NSString class]])
+					{
+						_isGame = [category rangeOfString:@"games"].location != NSNotFound;
+					}
+				}
+			}
 		}
 		else
 		{
-			self->_activationPolicy = NSApplicationActivationPolicyProhibited;
-			self->_icon = [NSImage imageNamed:@"NSDefaultApplicationIcon"];
-			self->_name = self.internalName;
+			_activationPolicy = NSApplicationActivationPolicyProhibited;
+			_icon = [NSImage imageNamed:@"NSDefaultApplicationIcon"];
+			_name = [_internalName copy];
+			
+			char pathBuffer[PROC_PIDPATHINFO_MAXSIZE] = {0};
+			int numberOfBytesRead = proc_pidpath(_processIdentifier, pathBuffer, sizeof(pathBuffer));
+			if (numberOfBytesRead > 0)
+			{
+				NSString *path = [[NSString alloc] initWithBytes:pathBuffer length:(NSUInteger)numberOfBytesRead encoding:NSUTF8StringEncoding];
+				if (path != nil)
+				{
+					_fileURL = [NSURL fileURLWithPath:path];
+				}
+			}
 		}
 		
 		_didFetchInfo = YES;
@@ -127,6 +155,36 @@
 {
 	[self fetchRunningApplicationInfo];
 	return _name;
+}
+
+- (NSURL *)fileURL
+{
+	[self fetchRunningApplicationInfo];
+	return _fileURL;
+}
+
+- (BOOL)isGame
+{
+	[self fetchRunningApplicationInfo];
+	return _isGame;
+}
+
+- (BOOL)isThirdParty
+{
+	[self fetchRunningApplicationInfo];
+	return _isThirdParty;
+}
+
+- (BOOL)isWebContent
+{
+	[self fetchRunningApplicationInfo];
+	return _isWebContent;
+}
+
+- (BOOL)hasHelpers
+{
+	[self fetchRunningApplicationInfo];
+	return _hasHelpers;
 }
 
 @end

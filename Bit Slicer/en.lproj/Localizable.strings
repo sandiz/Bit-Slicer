@@ -1,11 +1,3 @@
-/*
- Localizable.strings
- Bit Slicer
- 
- Created by Mayur Pawashe on 8/23/14.
- 
- */
-
 /* OK that would show up in alerts usually */
 "OK" = "OK";
 
@@ -17,3 +9,6 @@
 
 /* 'Multiple' selection label for AGScopeBar (scope bar used in search window) */
 "(Multiple)" = "(Multiple)";
+
+/* 'New Tab' menu item for 10.12 and later for creating a new tabbed search window */
+"New Tab" = "New Tab";

@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 10/29/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,6 +34,8 @@
 #import "ZGMemoryTypes.h"
 #import "ZGMachBinaryInfo.h"
 
+NS_ASSUME_NONNULL_BEGIN
+
 extern NSString * const ZGMachBinaryPathToBinaryInfoDictionary;
 extern NSString * const ZGMachBinaryPathToBinaryDictionary;
 extern NSString * const ZGFailedImageName;
@@ -44,11 +44,11 @@ extern NSString * const ZGFailedImageName;
 
 @interface ZGMachBinary : NSObject
 
-+ (instancetype)dynamicLinkerMachBinaryInProcess:(ZGProcess *)process;
-+ (NSArray *)machBinariesInProcess:(ZGProcess *)process;
-+ (instancetype)mainMachBinaryFromMachBinaries:(NSArray *)machBinaries;
-+ (instancetype)machBinaryNearestToAddress:(ZGMemoryAddress)address fromMachBinaries:(NSArray *)machBinaries;
-+ (instancetype)machBinaryWithPartialImageName:(NSString *)partialImageName inProcess:(ZGProcess *)process fromCachedMachBinaries:(NSArray *)machBinaries error:(NSError * __autoreleasing *)error;
++ (nullable instancetype)dynamicLinkerMachBinaryInProcess:(ZGProcess *)process;
++ (NSArray<ZGMachBinary *> *)machBinariesInProcess:(ZGProcess *)process;
++ (nullable instancetype)mainMachBinaryFromMachBinaries:(NSArray<ZGMachBinary *> *)machBinaries;
++ (nullable instancetype)machBinaryNearestToAddress:(ZGMemoryAddress)address fromMachBinaries:(NSArray<ZGMachBinary *> *)machBinaries;
++ (nullable instancetype)machBinaryWithPartialImageName:(NSString *)partialImageName inProcess:(ZGProcess *)process fromCachedMachBinaries:(nullable NSArray<ZGMachBinary *> *)machBinaries error:(NSError **)error;
 
 + (NSArray *)filePathSuffixesFromFilePaths:(NSArray *)filePaths;
 
@@ -57,10 +57,10 @@ extern NSString * const ZGFailedImageName;
 @property (nonatomic, readonly) ZGMemoryAddress headerAddress;
 @property (nonatomic, readonly) ZGMemoryAddress filePathAddress;
 
-- (NSComparisonResult)compare:(ZGMachBinary *)binaryImage;
+- (nullable NSString *)filePathInProcess:(ZGProcess *)process;
 
-- (NSString *)filePathInProcess:(ZGProcess *)process;
-
-- (ZGMachBinaryInfo *)machBinaryInfoInProcess:(ZGProcess *)process;
+- (nullable ZGMachBinaryInfo *)machBinaryInfoInProcess:(ZGProcess *)process;
 
 @end
+
+NS_ASSUME_NONNULL_END

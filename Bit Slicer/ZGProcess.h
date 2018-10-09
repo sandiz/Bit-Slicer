@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 10/28/09.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,23 +31,25 @@
  */
 
 #import <Foundation/Foundation.h>
+#import "ZGSymbolicator.h"
 #import "ZGMemoryTypes.h"
 #import <sys/sysctl.h>
 
 #define NON_EXISTENT_PID_NUMBER -1
 
-@class ZGSearchProgress;
+NS_ASSUME_NONNULL_BEGIN
+
 @class ZGMachBinary;
 
 @interface ZGProcess : NSObject
 
-- (instancetype)initWithName:(NSString *)processName internalName:(NSString *)internalName processID:(pid_t)aProcessID is64Bit:(BOOL)flag64Bit;
+- (instancetype)initWithName:(nullable NSString *)processName internalName:(NSString *)internalName processID:(pid_t)aProcessID is64Bit:(BOOL)flag64Bit;
 
-- (instancetype)initWithName:(NSString *)processName internalName:(NSString *)internalName is64Bit:(BOOL)flag64Bit;
+- (instancetype)initWithName:(nullable NSString *)processName internalName:(NSString *)internalName is64Bit:(BOOL)flag64Bit;
 
 - (instancetype)initWithProcess:(ZGProcess *)process;
 
-- (instancetype)initWithProcess:(ZGProcess *)process name:(NSString *)name;
+- (instancetype)initWithProcess:(ZGProcess *)process name:(nullable NSString *)name;
 
 - (instancetype)initWithProcess:(ZGProcess *)process processTask:(ZGMemoryMap)processTask;
 
@@ -60,13 +60,15 @@
 @property (nonatomic, readonly) NSString *internalName;
 @property (nonatomic, readonly) BOOL is64Bit;
 
-@property (nonatomic, readonly) ZGMachBinary *mainMachBinary;
-@property (nonatomic, readonly) ZGMachBinary *dylinkerBinary;
+// indicates if this represents any sort of actual program.. admittingly, this is kind of a hack
+@property (nonatomic) BOOL isDummy;
 
-@property (nonatomic, readonly) NSMutableDictionary *cacheDictionary;
+@property (nonatomic, readonly, nullable) ZGMachBinary *mainMachBinary;
+@property (nonatomic, readonly, nullable) ZGMachBinary *dylinkerBinary;
 
-- (NSString *)symbolAtAddress:(ZGMemoryAddress)address relativeOffset:(ZGMemoryAddress *)relativeOffset;
-- (NSNumber *)findSymbol:(NSString *)symbolName withPartialSymbolOwnerName:(NSString *)partialSymbolOwnerName requiringExactMatch:(BOOL)requiresExactMatch pastAddress:(ZGMemoryAddress)pastAddress;
+@property (nonatomic, readonly) NSMutableDictionary<NSString *, NSMutableDictionary *> *cacheDictionary;
+
+@property (nonatomic, readonly, nullable) id <ZGSymbolicator> symbolicator;
 
 - (BOOL)isEqual:(id)process;
 
@@ -75,3 +77,5 @@
 - (ZGMemorySize)pointerSize;
 
 @end
+
+NS_ASSUME_NONNULL_END

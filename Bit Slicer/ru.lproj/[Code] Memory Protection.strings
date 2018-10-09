@@ -1,0 +1,17 @@
+/* Alert title for when changing memory protection fails; used in two places */
+"protectionChangeFailedAlertTitle" = "Невозможно изменить Защиту Памяти";
+
+/* Alert message for when changing memory protection fails */
+"protectionChangeFailedAlertMessage" = "Нельзя изменить защиту памяти на указанные разрешения";
+
+/* Alert message for when finding a memory region fails */
+"findMemoryRegionFailedAlertMessage" = "Указанный адрес памяти не может быть расположен в области памяти";
+
+/* Undo action for changing memory protection */
+"undoProtectionChangeAction" = "Изменение Защиты";
+
+/* Alert title when user enters an invalid memory range address range */
+"invalidAddressRangeAlertTitle" = "Неверный диапазон адресов";
+
+/* Alert message when user enters an invalid memory range address range */
+"invalidAddressRangeAlertMessage" = "Пожалуйста, убедитесь в правильности ввода адресов.";

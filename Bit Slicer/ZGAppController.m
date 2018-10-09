@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 2/5/10.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,7 +30,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import "ZGAppController.h"
+#import <Cocoa/Cocoa.h>
+
+#import "ZGChosenProcessDelegate.h"
+#import "ZGMemorySelectionDelegate.h"
+#import "ZGShowMemoryWindow.h"
 #import "ZGPreferencesController.h"
 #import "ZGMemoryViewerController.h"
 #import "ZGDebuggerController.h"
@@ -41,34 +43,65 @@
 #import "ZGDocument.h"
 #import "ZGDocumentWindowController.h"
 #import "ZGScriptManager.h"
+#import "ZGScriptPrompt.h"
+#import "ZGScriptPromptWindowController.h"
 #import "ZGProcessTaskManager.h"
+#import "ZGRootlessConfiguration.h"
 #import "ZGDocumentController.h"
 #import "ZGHotKeyCenter.h"
 #import "ZGAppUpdaterController.h"
 #import "ZGAppTerminationState.h"
-#import "ZGNavigationPost.h"
+#import "ZGScriptingInterpreter.h"
+#import "ZGProcess.h"
+#import "ZGAboutWindowController.h"
+#import "ZGNullability.h"
 
 #define ZGLoggerIdentifier @"ZGLoggerIdentifier"
 #define ZGMemoryViewerIdentifier @"ZGMemoryViewerIdentifier"
 #define ZGDebuggerIdentifier @"ZGDebuggerIdentifier"
 
-@interface ZGAppController ()
+#define ZGRemoveRootlessProcessesKey @"ZGRemoveRootlessProcessesKey"
 
-@property (nonatomic) ZGAppUpdaterController *appUpdaterController;
-@property (nonatomic) ZGDocumentController *documentController;
-@property (nonatomic) ZGPreferencesController *preferencesController;
-@property (nonatomic) ZGMemoryViewerController *memoryViewer;
-@property (nonatomic) ZGDebuggerController *debuggerController;
-@property (nonatomic) ZGBreakPointController *breakPointController;
-@property (nonatomic) ZGLoggerWindowController *loggerWindowController;
-@property (nonatomic) ZGProcessTaskManager *processTaskManager;
-@property (nonatomic) ZGHotKeyCenter *hotKeyCenter;
+@interface ZGAppController : NSObject <NSApplicationDelegate, NSUserNotificationCenterDelegate, ZGChosenProcessDelegate, ZGShowMemoryWindow, ZGMemorySelectionDelegate>
 
 @end
 
 @implementation ZGAppController
+{
+	ZGAppUpdaterController * _Nonnull _appUpdaterController;
+	ZGDocumentController * _Nonnull _documentController;
+	ZGPreferencesController * _Nullable _preferencesController;
+	ZGMemoryViewerController * _Nonnull _memoryViewer;
+	ZGDebuggerController * _Nonnull _debuggerController;
+	ZGBreakPointController * _Nonnull _breakPointController;
+	ZGLoggerWindowController * _Nonnull _loggerWindowController;
+	ZGProcessTaskManager * _Nonnull _processTaskManager;
+	ZGRootlessConfiguration * _Nullable _rootlessConfiguration;
+	ZGHotKeyCenter * _Nonnull _hotKeyCenter;
+	ZGScriptingInterpreter * _Nonnull _scriptingInterpreter;
+	ZGAboutWindowController * _Nullable _aboutWindowController;
+	
+	NSString * _Nullable _lastChosenInternalProcessName;
+	NSMutableDictionary<NSNumber *, NSValue *> * _Nullable _memorySelectionRanges;
+	
+	BOOL _creatingNewTab;
+	IBOutlet NSMenu * _Nonnull _fileMenu;
+	IBOutlet NSMenuItem * _Nonnull _newDocumentMenuItem;
+	IBOutlet NSMenuItem * _Nonnull _showFontsMenuItem;
+}
 
 #pragma mark Birth & Death
+
++ (void)initialize
+{
+	static dispatch_once_t onceToken;
+	dispatch_once(&onceToken, ^{
+		if (@available(macOS 10.11, *))
+		{
+			[[NSUserDefaults standardUserDefaults] registerDefaults:@{ZGRemoveRootlessProcessesKey: @YES}];
+		}
+	});
+}
 
 - (id)init
 {
@@ -76,40 +109,66 @@
 	
 	if (self != nil)
 	{
-		self.appUpdaterController = [[ZGAppUpdaterController alloc] init];
+		_appUpdaterController = [[ZGAppUpdaterController alloc] init];
 		
-		self.processTaskManager = [[ZGProcessTaskManager alloc] init];
+		_processTaskManager = [[ZGProcessTaskManager alloc] init];
+		
+		if (@available(macOS 10.11, *))
+		{
+			if ([[NSUserDefaults standardUserDefaults] boolForKey:ZGRemoveRootlessProcessesKey])
+			{
+				_rootlessConfiguration = [[ZGRootlessConfiguration alloc] init];
+			}
+		}
 
-		self.hotKeyCenter = [[ZGHotKeyCenter alloc] init];
+		_hotKeyCenter = [[ZGHotKeyCenter alloc] init];
 
-		self.loggerWindowController = [[ZGLoggerWindowController alloc] init];
+		_loggerWindowController = [[ZGLoggerWindowController alloc] init];
 		
-		self.breakPointController = [ZGBreakPointController sharedController];
+		_scriptingInterpreter = [ZGScriptingInterpreter createInterpreterOnce];
 		
-		self.debuggerController = [[ZGDebuggerController alloc] initWithProcessTaskManager:self.processTaskManager breakPointController:self.breakPointController hotKeyCenter:self.hotKeyCenter loggerWindowController:self.loggerWindowController];
+		_breakPointController = [ZGBreakPointController createBreakPointControllerOnceWithScriptingInterpreter:_scriptingInterpreter];
 		
-		self.memoryViewer = [[ZGMemoryViewerController alloc] initWithProcessTaskManager:self.processTaskManager];
-		self.memoryViewer.debuggerController = self.debuggerController;
+		_debuggerController =
+		[[ZGDebuggerController alloc]
+		 initWithProcessTaskManager:_processTaskManager
+		 rootlessConfiguration:_rootlessConfiguration
+		 breakPointController:_breakPointController
+		 scriptingInterpreter:_scriptingInterpreter
+		 hotKeyCenter:_hotKeyCenter
+		 loggerWindowController:_loggerWindowController
+		 delegate:self];
 		
-		self.documentController = [[ZGDocumentController alloc] initWithProcessTaskManager:self.processTaskManager debuggerController:self.debuggerController breakPointController:self.breakPointController hotKeyCenter:self.hotKeyCenter loggerWindowController:self.loggerWindowController];
+		_memoryViewer =
+		[[ZGMemoryViewerController alloc]
+		 initWithProcessTaskManager:_processTaskManager
+		 rootlessConfiguration:_rootlessConfiguration
+		 haltedBreakPoints:_debuggerController.haltedBreakPoints
+		 delegate:self];
 		
-		[[NSNotificationCenter defaultCenter]
-		 addObserver:self
-		 selector:@selector(showWindowControllerNotification:)
-		 name:ZGNavigationShowMemoryViewerNotification
-		 object:nil];
-
-		[[NSNotificationCenter defaultCenter]
-		 addObserver:self
-		 selector:@selector(showWindowControllerNotification:)
-		 name:ZGNavigationShowDebuggerNotification
-		 object:nil];
-
-		[[NSNotificationCenter defaultCenter]
-		 addObserver:self
-		 selector:@selector(lastChosenInternalProcessNameChanged:)
-		 name:ZGLastChosenInternalProcessNameNotification
-		 object:nil];
+		__weak ZGAppController *weakSelf = self;
+		_documentController = [[ZGDocumentController alloc] initWithMakeDocumentWindowController:^ZGDocumentWindowController *{
+			ZGAppController *selfReference = weakSelf;
+			assert(selfReference != nil);
+			
+			BOOL creatingNewTab = selfReference->_creatingNewTab;
+			selfReference->_creatingNewTab = NO;
+			
+			return
+			[[ZGDocumentWindowController alloc]
+			 initWithProcessTaskManager:selfReference->_processTaskManager
+			 rootlessConfiguration:selfReference->_rootlessConfiguration
+			 debuggerController:selfReference->_debuggerController
+			 breakPointController:selfReference->_breakPointController
+			 scriptingInterpreter:selfReference->_scriptingInterpreter
+			 hotKeyCenter:selfReference->_hotKeyCenter
+			 loggerWindowController:selfReference->_loggerWindowController
+			 lastChosenInternalProcessName:selfReference->_lastChosenInternalProcessName
+			 preferringNewTab:creatingNewTab
+			 delegate:selfReference];
+		}];
+		
+		[[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:self];
 	}
 	
 	return self;
@@ -119,40 +178,67 @@
 {
 	ZGAppTerminationState *appTerminationState = [[ZGAppTerminationState alloc] init];
 	
-	self.breakPointController.appTerminationState = appTerminationState;
+	_breakPointController.appTerminationState = appTerminationState;
 	
-	[self.debuggerController cleanup];
-	[self.memoryViewer cleanup];
+	[_debuggerController cleanup];
+	[_memoryViewer cleanup];
 	
-	for (ZGDocument *document in self.documentController.documents)
+	for (ZGDocument *document in _documentController.documents)
 	{
-		ZGDocumentWindowController *documentWindowController = document.windowControllers.firstObject;
-		[documentWindowController.scriptManager cleanupWithAppTerminationState:appTerminationState];
-		[documentWindowController cleanup];
+		ZGDocumentWindowController *documentWindowController = (ZGDocumentWindowController *)document.windowControllers[0];
+		[documentWindowController cleanupWithAppTerminationState:appTerminationState];
 	}
 	
 	return appTerminationState.isDead ? NSTerminateNow : NSTerminateLater;
+}
+
+#pragma mark Tabs
+
+- (void)applicationDidFinishLaunching:(NSNotification *)__unused notification
+{
+	// Add New Tab menu item only if we are on 10.12 or later
+	if (@available(macOS 10.12, *))
+	{
+		// New Tab should use cmd t so make show font use cmd shift t
+		[_showFontsMenuItem setKeyEquivalent:@"T"];
+		
+		NSMenuItem *newTabMenuItem = [[NSMenuItem alloc] initWithTitle:NSLocalizedString(@"New Tab", nil) action:@selector(createNewTabbedWindow:) keyEquivalent:@"t"];
+		
+		[newTabMenuItem setKeyEquivalentModifierMask:NSCommandKeyMask];
+		[newTabMenuItem setTarget:self];
+		
+		NSInteger insertionIndex = [_fileMenu indexOfItem:_newDocumentMenuItem] + 1;
+		[_fileMenu insertItem:newTabMenuItem atIndex:insertionIndex];
+	}
+}
+
+- (IBAction)createNewTabbedWindow:(id)sender
+{
+	_creatingNewTab = YES;
+	[_documentController newDocument:sender];
 }
 
 #pragma mark Restoration
 
 + (void)restoreWindowWithIdentifier:(NSString *)identifier state:(NSCoder *)__unused state completionHandler:(void (^)(NSWindow *, NSError *))completionHandler
 {
-	ZGAppController *appController = [[NSApplication sharedApplication] delegate];
+	ZGAppController *appController = (ZGAppController *)[(NSApplication *)[NSApplication sharedApplication] delegate];
+	
+	assert([appController isKindOfClass:[ZGAppController class]]);
 	
 	NSWindowController *restoredWindowController = nil;
 	
 	if ([identifier isEqualToString:ZGMemoryViewerIdentifier])
 	{
-		restoredWindowController = appController.memoryViewer;
+		restoredWindowController = appController->_memoryViewer;
 	}
 	else if ([identifier isEqualToString:ZGDebuggerIdentifier])
 	{
-		restoredWindowController = appController.debuggerController;
+		restoredWindowController = appController->_debuggerController;
 	}
 	else if ([identifier isEqualToString:ZGLoggerIdentifier])
 	{
-		restoredWindowController = appController.loggerWindowController;
+		restoredWindowController = appController->_loggerWindowController;
 	}
 	
 	if (restoredWindowController != nil)
@@ -173,7 +259,7 @@
 	
 	if (firstTimeLoading)
 	{
-		windowController.window.restorationClass = self.class;
+		windowController.window.restorationClass = [self class];
 		windowController.window.identifier = windowIdentifier;
 	}
 	
@@ -182,7 +268,7 @@
 
 #pragma mark Menu Actions
 
-- (void)showMemoryWindowController:(id)memoryWindowController withWindowIdentifier:(NSString *)windowIdentifier andCanReadMemory:(BOOL)canReadMemory
+- (void)showMemoryWindowController:(ZGMemoryNavigationWindowController *)memoryWindowController withWindowIdentifier:(NSString *)windowIdentifier andCanReadMemory:(BOOL)canReadMemory
 {
 	[memoryWindowController showWindow:nil];
 	
@@ -193,71 +279,114 @@
 
 - (IBAction)openMemoryViewer:(id)__unused sender
 {
-	[self showMemoryWindowController:self.memoryViewer withWindowIdentifier:ZGMemoryViewerIdentifier andCanReadMemory:YES];
+	[self showMemoryWindowController:_memoryViewer withWindowIdentifier:ZGMemoryViewerIdentifier andCanReadMemory:YES];
 }
 
 - (IBAction)openDebugger:(id)__unused sender
 {
-	[self showMemoryWindowController:self.debuggerController withWindowIdentifier:ZGDebuggerIdentifier andCanReadMemory:YES];
+	[self showMemoryWindowController:_debuggerController withWindowIdentifier:ZGDebuggerIdentifier andCanReadMemory:YES];
 }
 
 - (IBAction)openLogger:(id)__unused sender
 {
-	[self.loggerWindowController showWindow:nil];
+	[_loggerWindowController showWindow:nil];
 	
-	[self setRestorationForWindowController:self.loggerWindowController withWindowIdentifier:ZGLoggerIdentifier];
+	[self setRestorationForWindowController:_loggerWindowController withWindowIdentifier:ZGLoggerIdentifier];
 }
 
 - (IBAction)openPreferences:(id)__unused sender
 {
-	if (self.preferencesController == nil)
+	if (_preferencesController == nil)
 	{
-		self.preferencesController = [[ZGPreferencesController alloc] initWithHotKeyCenter:self.hotKeyCenter debuggerController:self.debuggerController appUpdaterController:self.appUpdaterController];
+		_preferencesController = [[ZGPreferencesController alloc] initWithHotKeyCenter:_hotKeyCenter debuggerController:_debuggerController appUpdaterController:_appUpdaterController];
 	}
 	
-	[self.preferencesController showWindow:nil];
+	[_preferencesController showWindow:nil];
 }
 
 - (IBAction)checkForUpdates:(id)__unused sender
 {
-	[self.appUpdaterController checkForUpdates];
+	[_appUpdaterController checkForUpdates];
 }
 
-#pragma mark Notifications
-
-- (void)showWindowControllerNotification:(NSNotification *)notification
+- (IBAction)openAboutWindow:(id)__unused sender
 {
-	ZGProcess *process = [notification.userInfo objectForKey:ZGNavigationProcessKey];
-	ZGMemoryAddress address = [[notification.userInfo objectForKey:ZGNavigationMemoryAddressKey] unsignedLongLongValue];
+	if (_aboutWindowController == nil)
+	{
+		_aboutWindowController = [[ZGAboutWindowController alloc] init];
+	}
+	[_aboutWindowController showWindow:nil];
+}
+
+#pragma mark Delegate Methods
+
+- (void)showDebuggerWindowWithProcess:(ZGProcess *)process address:(ZGMemoryAddress)address
+{
+	[self showMemoryWindowController:_debuggerController withWindowIdentifier:ZGDebuggerIdentifier andCanReadMemory:NO];
+	[_debuggerController jumpToMemoryAddress:address inProcess:process];
+}
+
+- (void)showMemoryViewerWindowWithProcess:(ZGProcess *)process address:(ZGMemoryAddress)address selectionLength:(ZGMemorySize)selectionLength
+{
+	[self showMemoryWindowController:_memoryViewer withWindowIdentifier:ZGMemoryViewerIdentifier andCanReadMemory:NO];
+	[_memoryViewer jumpToMemoryAddress:address withSelectionLength:selectionLength inProcess:process];
+}
+
+- (void)memoryWindowController:(ZGMemoryWindowController *)memoryWindowController didChangeProcessInternalName:(NSString *)newChosenInternalProcessName
+{
+	_lastChosenInternalProcessName = [newChosenInternalProcessName copy];
 	
-	if ([notification.name isEqualToString:ZGNavigationShowDebuggerNotification])
+	if (_debuggerController != memoryWindowController)
 	{
-		[self showMemoryWindowController:self.debuggerController withWindowIdentifier:ZGDebuggerIdentifier andCanReadMemory:NO];
-		[self.debuggerController jumpToMemoryAddress:address inProcess:process];
+		_debuggerController.lastChosenInternalProcessName = newChosenInternalProcessName;
 	}
-	else if ([notification.name isEqualToString:ZGNavigationShowMemoryViewerNotification])
+	
+	if (_memoryViewer != memoryWindowController)
 	{
-		ZGMemoryAddress selectionLength = [[notification.userInfo objectForKey:ZGNavigationSelectionLengthKey] unsignedLongLongValue];
-		
-		[self showMemoryWindowController:self.memoryViewer withWindowIdentifier:ZGMemoryViewerIdentifier andCanReadMemory:NO];
-		[self.memoryViewer jumpToMemoryAddress:address withSelectionLength:selectionLength inProcess:process];
+		_memoryViewer.lastChosenInternalProcessName = newChosenInternalProcessName;
 	}
 }
 
-- (void)lastChosenInternalProcessNameChanged:(NSNotification *)notification
+- (void)memorySelectionDidChange:(NSRange)newMemorySelectionRange process:(ZGProcess *)process
 {
-	NSString *lastChosenInternalProcessName = [notification.userInfo objectForKey:ZGLastChosenInternalProcessNameKey];
-
-	self.documentController.lastChosenInternalProcessName = lastChosenInternalProcessName;
-
-	if (self.debuggerController != notification.object)
+	if (_memorySelectionRanges == nil)
 	{
-		self.debuggerController.lastChosenInternalProcessName = lastChosenInternalProcessName;
+		_memorySelectionRanges = [[NSMutableDictionary alloc] init];
 	}
+	_memorySelectionRanges[@(process.processID)] = [NSValue valueWithRange:newMemorySelectionRange];
+}
 
-	if (self.memoryViewer != notification.object)
+- (NSRange)lastMemorySelectionForProcess:(ZGProcess *)process
+{
+	if (_memorySelectionRanges == nil || _memorySelectionRanges[@(process.processID)] == nil)
 	{
-		self.memoryViewer.lastChosenInternalProcessName = lastChosenInternalProcessName;
+		return NSMakeRange(0, 0);
+	}
+	
+	return _memorySelectionRanges[@(process.processID)].rangeValue;
+}
+
+#pragma mark User Notifications
+
+- (BOOL)userNotificationCenter:(NSUserNotificationCenter *)__unused center shouldPresentNotification:(NSUserNotification *)notification
+{
+	return [(NSNumber *)notification.userInfo[ZGScriptNotificationTypeKey] boolValue] || ![NSApp isActive];
+}
+
+- (void)userNotificationCenter:(NSUserNotificationCenter *)__unused center didActivateNotification:(NSUserNotification *)notification
+{
+	if (notification.activationType == NSUserNotificationActivationTypeReplied)
+	{
+		NSNumber *scriptPromptHash = notification.userInfo[ZGScriptNotificationPromptHashKey];
+		if (scriptPromptHash != nil)
+		{
+			for (ZGDocument *document in _documentController.documents)
+			{
+				ZGDocumentWindowController *documentWindowController = (ZGDocumentWindowController *)document.windowControllers[0];
+				ZGScriptManager *scriptManager = documentWindowController.scriptManager;
+				[scriptManager handleScriptPromptHash:scriptPromptHash withUserNotificationReply:notification.response.string];
+			}
+		}
 	}
 }
 
@@ -266,31 +395,13 @@
 #define WIKI_URL @"https://github.com/zorgiepoo/Bit-Slicer/wiki"
 - (IBAction)help:(id)__unused sender
 {	
-	[NSWorkspace.sharedWorkspace openURL:[NSURL URLWithString:WIKI_URL]];
+	[[NSWorkspace sharedWorkspace] openURL:ZGUnwrapNullableObject([NSURL URLWithString:WIKI_URL])];
 }
 
 #define ISSUES_TRACKER_URL @"https://github.com/zorgiepoo/Bit-Slicer/issues"
 - (IBAction)reportABug:(id)__unused sender
 {
-	[NSWorkspace.sharedWorkspace openURL:[NSURL URLWithString:ISSUES_TRACKER_URL]];
-}
-
-#define FORUMS_URL @"http://portingteam.com/forum/157-bit-slicer/"
-- (IBAction)visitForums:(id)__unused sender
-{
-	[NSWorkspace.sharedWorkspace openURL:[NSURL URLWithString:FORUMS_URL]];
-}
-
-#define FEEDBACK_EMAIL @"zorgiepoo@gmail.com"
-- (IBAction)sendFeedback:(id)__unused sender
-{
-	[NSWorkspace.sharedWorkspace openURL:[NSURL URLWithString:[@"mailto:" stringByAppendingString:FEEDBACK_EMAIL]]];
-}
-
-#define DONATION_URL @"https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=A3DTDV2F3VE5G&lc=US&item_name=Bit%20Slicer%20App&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donate_SM%2egif%3aNonHosted"
-- (IBAction)openDonationURL:(id)__unused sender
-{
-	[NSWorkspace.sharedWorkspace openURL:[NSURL URLWithString:DONATION_URL]];
+	[[NSWorkspace sharedWorkspace] openURL:ZGUnwrapNullableObject([NSURL URLWithString:ISSUES_TRACKER_URL])];
 }
 
 @end

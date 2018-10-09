@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 2/22/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,24 +32,32 @@
 
 #import <Cocoa/Cocoa.h>
 #import "ZGMemoryTypes.h"
+#import "ZGShowMemoryWindow.h"
 
 @class ZGProcess;
 @class ZGBacktrace;
+@class ZGInstruction;
+
+NS_ASSUME_NONNULL_BEGIN
 
 @protocol ZGBacktraceViewControllerDelegate <NSObject>
 
 - (void)backtraceSelectionChangedToAddress:(ZGMemoryAddress)address;
 
+@property (nonatomic, weak, readonly, nullable) id <ZGShowMemoryWindow> delegate;
+
 @end
 
 @interface ZGBacktraceViewController : NSViewController
 
-- (id)initWithDelegate:(id <ZGBacktraceViewControllerDelegate>)delegate;
+- (id)initWithDelegate:(nullable id <ZGBacktraceViewControllerDelegate>)delegate;
 
 @property (nonatomic) ZGBacktrace *backtrace;
 @property (nonatomic) ZGProcess *process;
 
-@property (nonatomic, readonly) NSArray *selectedInstructions;
+@property (nonatomic, readonly) NSArray<ZGInstruction *> *selectedInstructions;
 @property (nonatomic, readonly) NSTableView *tableView;
 
 @end
+
+NS_ASSUME_NONNULL_END

@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 12/29/12.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,7 +31,7 @@
  */
 
 #import <Foundation/Foundation.h>
-#import "Python.h"
+#import "Python/Python.h"
 #import "ZGMemoryTypes.h"
 #import "ZGBreakPointDelegate.h"
 #import "ZGThreadStates.h"
@@ -41,35 +39,40 @@
 @class ZGVariable;
 @class ZGProcess;
 @class ZGRegistersState;
+@class ZGDebugThread;
 
-typedef enum
+typedef NS_ENUM(NSInteger, ZGBreakPointType)
 {
 	ZGBreakPointWatchData,
 	ZGBreakPointInstruction,
 	ZGBreakPointSingleStepInstruction,
-} ZGBreakPointType;
+};
+
+NS_ASSUME_NONNULL_BEGIN
 
 @interface ZGBreakPoint : NSObject
 
-- (id)initWithProcess:(ZGProcess *)process type:(ZGBreakPointType)type  delegate:(id <ZGBreakPointDelegate>)delegate;
+- (id)initWithProcess:(ZGProcess *)process type:(ZGBreakPointType)type delegate:(nullable id <ZGBreakPointDelegate>)delegate;
 
-@property (atomic, weak) id <ZGBreakPointDelegate> delegate;
+@property (atomic, weak, nullable) id <ZGBreakPointDelegate> delegate;
 @property (readonly, nonatomic) ZGMemoryMap task;
 @property (nonatomic) thread_act_t thread;
-@property (nonatomic) ZGVariable *variable;
+@property (nonatomic, nullable) ZGVariable *variable;
 @property (nonatomic) ZGMemorySize watchSize;
 @property (readonly, nonatomic) ZGProcess *process;
-@property (atomic) NSArray *debugThreads;
+@property (atomic, nullable) NSArray<ZGDebugThread *> *debugThreads;
 @property (readonly, nonatomic) ZGBreakPointType type;
 @property (atomic) BOOL needsToRestore;
-@property (atomic) BOOL hidden;
+@property (nonatomic) BOOL hidden;
 @property (atomic) BOOL dead;
-@property (atomic) ZGMemoryAddress basePointer;
-@property (nonatomic) NSMutableDictionary *cacheDictionary;
-@property (nonatomic) PyObject *condition;
-@property (nonatomic) PyObject *callback;
-@property (nonatomic) NSError *error;
+@property (nonatomic) ZGMemoryAddress basePointer;
+@property (nonatomic) NSMutableDictionary<NSNumber *, NSNumber *> *cacheDictionary;
+@property (nonatomic, nullable) PyObject *condition;
+@property (nonatomic, nullable) PyObject *callback;
+@property (nonatomic, nullable) NSError *error;
 @property (nonatomic) ZGMemoryProtection originalProtection;
 @property (nonatomic) ZGRegistersState *registersState;
 
 @end
+
+NS_ASSUME_NONNULL_END

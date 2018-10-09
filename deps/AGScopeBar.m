@@ -29,12 +29,10 @@
 //	distribution.
 //
 
-// Modified by Mayur to fix some unused var warnings, inserting some typecasts for [[self class] alloc],
-// and replacing deprecated Gestalt() with using NSAppKitVersionNumber
+// NOTE: This class has been modified to fix some unused var warnings, inserting some typecasts for [[self class] alloc],
+// replacing deprecated Gestalt() usage, fixing nullability warnings, and adding dark mode support
 
 #import "AGScopeBar.h"
-
-
 
 #define SCOPE_BAR_HORZ_INSET			8.0						// inset on left and right
 #define SCOPE_BAR_HEIGHT				25.0					// used in -sizeToFit
@@ -55,10 +53,7 @@
 
 
 #pragma mark  
-@interface AGScopeBarPopupButtonCell : NSPopUpButtonCell {
-	NSButton * mRecessedButton;
-	NSPopUpButtonCell * mPopupCell;
-}
+@interface AGScopeBarPopupButtonCell : NSPopUpButtonCell
 @end
 
 
@@ -100,6 +95,83 @@
 #pragma mark  
 #pragma mark ========================================
 @implementation AGScopeBar
+{
+	id<AGScopeBarDelegate> mDelegate;
+	BOOL mSmartResizeEnabled;
+	NSView * mAccessoryView;
+	NSArray * mGroups;
+	BOOL mIsEnabled;
+	AGScopeBarAppearance * mScopeBarAppearance;
+	
+	BOOL mNeedsTiling;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability"
+	NSAppearance *currentAppearance;
+#pragma clang diagnostic pop
+}
+
+static CGFloat colorValue(CGFloat value, BOOL invert)
+{
+	return invert ? (1.0 - value) : value;
+}
+
+- (void)updateAppearance
+{
+	[mScopeBarAppearance release];
+	
+	if (@available(macOS 10.10, *)) {
+		// Yosemite and Later
+		mScopeBarAppearance = [[AGScopeBarAppearance alloc] init];
+		
+		BOOL invertColors;
+#if defined(MAC_OS_X_VERSION_10_14) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_14
+		if (@available(macOS 10.14, *)) {
+			// Borrowing how HexFiend detects dark mode
+			invertColors = [NSAppearance.currentAppearance.name isEqualToString:NSAppearanceNameDarkAqua];
+			[currentAppearance release];
+			currentAppearance = [NSAppearance.currentAppearance retain];
+		} else {
+			invertColors = NO;
+		}
+#else
+		invertColors = NO;
+#endif
+		
+		mScopeBarAppearance.backgroundTopColor              = [NSColor colorWithCalibratedWhite:colorValue(0.89, invertColors) alpha:1.0];
+		mScopeBarAppearance.backgroundBottomColor           = [NSColor colorWithCalibratedWhite:colorValue(0.87, invertColors) alpha:1.0];
+		mScopeBarAppearance.inactiveBackgroundTopColor      = [NSColor colorWithCalibratedWhite:colorValue(0.95, invertColors) alpha:1.0];
+		mScopeBarAppearance.inactiveBackgroundBottomColor   = [NSColor colorWithCalibratedWhite:colorValue(0.95, invertColors) alpha:1.0];
+		mScopeBarAppearance.borderBottomColor               = [NSColor colorWithCalibratedWhite:colorValue(0.6, invertColors) alpha:1.0];
+		
+		mScopeBarAppearance.separatorColor                  = [NSColor colorWithCalibratedWhite:colorValue(0.52, invertColors) alpha:1.0];
+		mScopeBarAppearance.separatorWidth                  = 1.0;
+		mScopeBarAppearance.separatorHeight                 = 16.0;
+		
+		mScopeBarAppearance.labelColor                      = [NSColor colorWithCalibratedWhite:colorValue(0.45, invertColors) alpha:1.0];
+		mScopeBarAppearance.labelFont                       = [NSFont boldSystemFontOfSize:12.0];
+		mScopeBarAppearance.itemButtonFont                  = [NSFont boldSystemFontOfSize:12.0];
+		mScopeBarAppearance.menuItemFont                    = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:NSRegularControlSize]];
+		
+	} else {
+		// Mavericks and before
+		mScopeBarAppearance = [[AGScopeBarAppearance alloc] init];
+		
+		mScopeBarAppearance.backgroundTopColor              = [NSColor colorWithCalibratedWhite:0.90 alpha:1.0];
+		mScopeBarAppearance.backgroundBottomColor           = [NSColor colorWithCalibratedWhite:0.75 alpha:1.0];
+		mScopeBarAppearance.inactiveBackgroundTopColor      = [NSColor colorWithCalibratedWhite:0.90 alpha:1.0];
+		mScopeBarAppearance.inactiveBackgroundBottomColor   = [NSColor colorWithCalibratedWhite:0.75 alpha:1.0];
+		mScopeBarAppearance.borderBottomColor               = [NSColor colorWithCalibratedWhite:0.5 alpha:1.0];
+		
+		mScopeBarAppearance.separatorColor                  = [NSColor colorWithCalibratedWhite:0.52 alpha:1.0];
+		mScopeBarAppearance.separatorWidth                  = 1.0;
+		mScopeBarAppearance.separatorHeight                 = 16.0;
+		
+		mScopeBarAppearance.labelColor                      = [NSColor colorWithCalibratedWhite:0.45 alpha:1.0];
+		mScopeBarAppearance.labelFont                       = [NSFont boldSystemFontOfSize:12.0];
+		mScopeBarAppearance.itemButtonFont                  = [NSFont boldSystemFontOfSize:12.0];
+		mScopeBarAppearance.menuItemFont                    = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:NSRegularControlSize]];
+	}
+}
 
 - (id)initWithFrame:(NSRect)frameRect
 {
@@ -111,46 +183,7 @@
 	mGroups = [[NSArray array] retain];
 	mIsEnabled = YES;
 	
-	{
-		if (floor(NSAppKitVersionNumber) > NSAppKitVersionNumber10_9) {
-			// Yosemite and Later
-			mScopeBarAppearance = [[AGScopeBarAppearance alloc] init];
-			
-			mScopeBarAppearance.backgroundTopColor              = [NSColor colorWithCalibratedWhite:0.89 alpha:1.0];
-			mScopeBarAppearance.backgroundBottomColor           = [NSColor colorWithCalibratedWhite:0.87 alpha:1.0];
-			mScopeBarAppearance.inactiveBackgroundTopColor      = [NSColor colorWithCalibratedWhite:0.95 alpha:1.0];
-			mScopeBarAppearance.inactiveBackgroundBottomColor   = [NSColor colorWithCalibratedWhite:0.95 alpha:1.0];
-			mScopeBarAppearance.borderBottomColor               = [NSColor colorWithCalibratedWhite:0.6 alpha:1.0];
-			
-			mScopeBarAppearance.separatorColor                  = [NSColor colorWithCalibratedWhite:0.52 alpha:1.0];
-			mScopeBarAppearance.separatorWidth                  = 1.0;
-			mScopeBarAppearance.separatorHeight                 = 16.0;
-			
-			mScopeBarAppearance.labelColor                      = [NSColor colorWithCalibratedWhite:0.45 alpha:1.0];
-			mScopeBarAppearance.labelFont                       = [NSFont boldSystemFontOfSize:12.0];
-			mScopeBarAppearance.itemButtonFont                  = [NSFont boldSystemFontOfSize:12.0];
-			mScopeBarAppearance.menuItemFont                    = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:NSRegularControlSize]];
-			
-		} else {
-			// Mavericks and before
-			mScopeBarAppearance = [[AGScopeBarAppearance alloc] init];
-			
-			mScopeBarAppearance.backgroundTopColor              = [NSColor colorWithCalibratedWhite:0.90 alpha:1.0];
-			mScopeBarAppearance.backgroundBottomColor           = [NSColor colorWithCalibratedWhite:0.75 alpha:1.0];
-			mScopeBarAppearance.inactiveBackgroundTopColor      = [NSColor colorWithCalibratedWhite:0.90 alpha:1.0];
-			mScopeBarAppearance.inactiveBackgroundBottomColor   = [NSColor colorWithCalibratedWhite:0.75 alpha:1.0];
-			mScopeBarAppearance.borderBottomColor               = [NSColor colorWithCalibratedWhite:0.5 alpha:1.0];
-			
-			mScopeBarAppearance.separatorColor                  = [NSColor colorWithCalibratedWhite:0.52 alpha:1.0];
-			mScopeBarAppearance.separatorWidth                  = 1.0;
-			mScopeBarAppearance.separatorHeight                 = 16.0;
-			
-			mScopeBarAppearance.labelColor                      = [NSColor colorWithCalibratedWhite:0.45 alpha:1.0];
-			mScopeBarAppearance.labelFont                       = [NSFont boldSystemFontOfSize:12.0];
-			mScopeBarAppearance.itemButtonFont                  = [NSFont boldSystemFontOfSize:12.0];
-			mScopeBarAppearance.menuItemFont                    = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:NSRegularControlSize]];
-		}
-	}
+	[self updateAppearance];
 	
 	return self;
 }
@@ -335,7 +368,7 @@
 
 - (void)insertGroup:(AGScopeBarGroup *)group atIndex:(NSUInteger)index;
 {
-	NSMutableArray * groups = [[self.groups mutableCopy] autorelease];
+	NSMutableArray * groups = [(NSMutableArray *)[self.groups mutableCopy] autorelease];
 	[groups insertObject:group atIndex:index];
 	self.groups = groups;
 }
@@ -343,7 +376,7 @@
 
 - (void)removeGroupAtIndex:(NSUInteger)index;
 {
-	NSMutableArray * groups = [[self.groups mutableCopy] autorelease];
+	NSMutableArray * groups = [(NSMutableArray *)[self.groups mutableCopy] autorelease];
 	[groups removeObjectAtIndex:index];
 	self.groups = groups;
 }
@@ -420,6 +453,13 @@
 {
 	BOOL isWindowActive = (self.window.isMainWindow || self.window.isKeyWindow);
 	
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability"
+	// currentAppearance != nil only if we're on at least 10.14
+	if (currentAppearance != nil && ![currentAppearance.name isEqualToString:NSAppearance.currentAppearance.name]) {
+		[self updateAppearance];
+	}
+#pragma clang diagnostic pop
 	
 	// Draw gradient background
 	NSGradient * gradient = nil;
@@ -472,7 +512,7 @@
 	
 	
 	// Remove all group views (clears out any old ones too)
-	for (NSView * view in [[self.subviews copy] autorelease]) {
+	for (NSView * view in [(NSArray *)[self.subviews copy] autorelease]) {
 		[view removeFromSuperview];
 	}
 	
@@ -596,6 +636,25 @@
 #pragma mark  
 #pragma mark ========================================
 @implementation AGScopeBarGroup
+{
+	NSString * mIdentifier;
+	NSString * mLabel;
+	BOOL mShowsSeparator;
+	BOOL mCanBeCollapsed;
+	AGScopeBarGroupSelectionMode mSelectionMode;
+	BOOL mIsEnabled;
+	NSArray * mItems;
+	NSArray * mSelectedItems;
+	
+	AGScopeBar * mScopeBar;
+	NSView * mView;
+	NSTextField * mLabelField;
+	
+	NSView * mCollapsedView;
+	NSTextField * mCollapsedLabelField;
+	NSPopUpButton * mGroupPopupButton;
+	BOOL mIsCollapsed;
+}
 
 
 + (AGScopeBarGroup *)groupWithIdentifier:(NSString *)identifier;
@@ -831,7 +890,7 @@
 
 - (void)insertItem:(AGScopeBarItem *)item atIndex:(NSUInteger)index;
 {
-	NSMutableArray * items = [[self.items mutableCopy] autorelease];
+	NSMutableArray * items = [(NSMutableArray *)[self.items mutableCopy] autorelease];
 	[items insertObject:item atIndex:index];
 	self.items = items;
 }
@@ -839,7 +898,7 @@
 
 - (void)removeItemAtIndex:(NSUInteger)index;
 {
-	NSMutableArray * items = [[self.items mutableCopy] autorelease];
+	NSMutableArray * items = [(NSMutableArray *)[self.items mutableCopy] autorelease];
 	[items removeObjectAtIndex:index];
 	self.items = items;
 }
@@ -868,7 +927,7 @@
 
 - (void)menuWillOpen:(NSMenu *)menu;
 {
-	if (menu == mGroupPopupButton.menu) {
+	if (menu == (NSMenu * _Nonnull)mGroupPopupButton.menu) {
 		[mGroupPopupButton removeAllItems];
 		
 		for (AGScopeBarItem * item in self.items) {
@@ -881,16 +940,16 @@
 }
 
 
-- (void)menuDidClose:(NSMenu *)menu;
+- (void)menuDidClose:(NSMenu *)__unused menu;
 {
-	if (menu == mGroupPopupButton.menu) {
-		
-		// Hmm. Was doing this for some reason that I unfortunately cannot recall.
-		// The issue in doing it though is that the clicked-on menu item's action
-		// will not be sent to the target if it's removed from the menu! I thought
-		// it use to work though. This may be a recent change in 10.9?
-		//[mGroupPopupButton removeAllItems];
-	}
+//	if (menu == mGroupPopupButton.menu) {
+//		
+//		// Hmm. Was doing this for some reason that I unfortunately cannot recall.
+//		// The issue in doing it though is that the clicked-on menu item's action
+//		// will not be sent to the target if it's removed from the menu! I thought
+//		// it use to work though. This may be a recent change in 10.9?
+//		//[mGroupPopupButton removeAllItems];
+//	}
 }
 
 
@@ -915,7 +974,7 @@
 	// Full View
 	// -----------------------------------------
 	{
-		for (NSView * view in [[self.view.subviews copy] autorelease]) {
+		for (NSView * view in [(NSArray *)[self.view.subviews copy] autorelease]) {
 			[view removeFromSuperview];
 		}
 		
@@ -1013,7 +1072,7 @@
 			[mGroupPopupButton setFont:mScopeBar.scopeBarAppearance.itemButtonFont];
 			[mGroupPopupButton setBezelStyle:NSRecessedBezelStyle];
 			[mGroupPopupButton setButtonType:NSPushOnPushOffButton];
-			[mGroupPopupButton.cell setHighlightsBy:NSCellIsBordered | NSCellIsInsetButton];
+			[mGroupPopupButton.cell setHighlightsBy:(NSCellStyleMask)(NSCellIsBordered | NSCellIsInsetButton)];
 			[mGroupPopupButton setShowsBorderOnlyWhileMouseInside:YES];
 			[mGroupPopupButton.cell setAltersStateOfSelectedItem:NO];
 			[mGroupPopupButton.cell setArrowPosition:NSPopUpArrowAtBottom];
@@ -1143,9 +1202,9 @@
 		}
 	} else {
 		
-		NSMutableArray * items = [[oldSelectedItems mutableCopy] autorelease];
+		NSMutableArray * items = [(NSMutableArray *)[oldSelectedItems mutableCopy] autorelease];
 		[items removeObject:item];
-		newSelectedItems = [[items copy] autorelease];
+		newSelectedItems = [(NSArray *)[items copy] autorelease];
 		
 		if (self.requiresSelection) {
 			if (newSelectedItems.count == 0) {
@@ -1179,7 +1238,7 @@
 	
 	if (!self.allowsMultipleSelection) {
 		if (selectedItems.count > 1) {
-			selectedItems = [NSArray arrayWithObject:[selectedItems lastObject]];
+			selectedItems = [NSArray arrayWithObject:(id _Nonnull)[selectedItems lastObject]];
 		}
 	}
 	
@@ -1253,6 +1312,19 @@
 #pragma mark  
 #pragma mark ========================================
 @implementation AGScopeBarItem
+{
+	NSString * mIdentifier;
+	NSString * mTitle;
+	NSString * mToolTip;
+	NSImage * mImage;
+	NSMenu * mMenu;
+	BOOL mIsSelected;
+	BOOL mIsEnabled;
+	
+	AGScopeBarGroup * mGroup;
+	NSButton * mButton;
+	NSMenuItem * mMenuItem;
+}
 
 
 + (AGScopeBarItem *)itemWithIdentifier:(NSString *)identifier;
@@ -1490,7 +1562,7 @@
 	[button setAction:@selector(scopeButtonClicked:)];
 	[button setBezelStyle:NSRecessedBezelStyle];
 	[button setButtonType:NSPushOnPushOffButton];
-	[button.cell setHighlightsBy:NSCellIsBordered | NSCellIsInsetButton];
+	[button.cell setHighlightsBy:(NSCellStyleMask)(NSCellIsBordered | NSCellIsInsetButton)];
 	[button setShowsBorderOnlyWhileMouseInside:YES];
 	[button.cell setBackgroundStyle:NSBackgroundStyleRaised];
 	
@@ -1575,6 +1647,10 @@
 #pragma mark  
 #pragma mark ========================================
 @implementation AGScopeBarPopupButtonCell
+{
+	NSButton * mRecessedButton;
+	NSPopUpButtonCell * mPopupCell;
+}
 
 - (id)initTextCell:(NSString *)title pullsDown:(BOOL)pullsDown
 {
@@ -1589,7 +1665,7 @@
 	mRecessedButton.buttonType = NSPushOnPushOffButton;
 	mRecessedButton.bezelStyle = NSRecessedBezelStyle;
 	mRecessedButton.showsBorderOnlyWhileMouseInside = NO;
-	[mRecessedButton.cell setHighlightsBy:NSCellIsBordered | NSCellIsInsetButton];
+	[mRecessedButton.cell setHighlightsBy:(NSCellStyleMask)(NSCellIsBordered | NSCellIsInsetButton)];
 	mRecessedButton.state = NSOnState;
 	
 	// We use another popup cell so that the font of the displayed menu does not
@@ -1755,6 +1831,20 @@
 #pragma mark ========================================
 
 @implementation AGScopeBarAppearance
+{
+	NSColor * backgroundTopColor;
+	NSColor * backgroundBottomColor;
+	NSColor * inactiveBackgroundTopColor;
+	NSColor * inactiveBackgroundBottomColor;
+	NSColor * borderBottomColor;
+	NSColor * separatorColor;
+	CGFloat separatorWidth;
+	CGFloat separatorHeight;
+	NSColor * labelColor;
+	NSFont * labelFont;
+	NSFont * itemButtonFont;
+	NSFont * menuItemFont;
+}
 
 - (void)dealloc
 {

@@ -15,9 +15,6 @@
 #import "SRRecorderCell.h"
 
 @interface SRRecorderControl : NSControl
-{
-	IBOutlet id delegate;
-}
 
 #pragma mark *** Aesthetics ***
 - (BOOL)animates;
@@ -68,7 +65,12 @@
 #pragma mark *** Binding Methods ***
 
 - (NSDictionary *)objectValue;
+
+#if __MAC_OS_X_VERSION_MAX_ALLOWED > __MAC_10_9
 - (void)setObjectValue:(id)shortcut;
+#else
+- (void)setObjectValue:(id <NSCopying>)shortcut;
+#endif
 
 @end
 

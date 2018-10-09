@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 3/29/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,7 +38,8 @@
 #import "ZGProcess.h"
 #import "ZGRegion.h"
 #import "ZGMachBinary.h"
-#import "ZGUtilities.h"
+#import "ZGDebugLogging.h"
+#import "ZGDataValueExtracting.h"
 
 #define JUMP_REL32_INSTRUCTION_LENGTH 5
 #define INDIRECT_JUMP_INSTRUCTIONS_LENGTH 14
@@ -50,7 +49,7 @@
 
 #pragma mark Reading & Writing Data
 
-+ (NSData *)readDataWithProcessTask:(ZGMemoryMap)processTask address:(ZGMemoryAddress)address size:(ZGMemorySize)size breakPoints:(NSArray *)breakPoints
++ (NSData *)readDataWithProcessTask:(ZGMemoryMap)processTask address:(ZGMemoryAddress)address size:(ZGMemorySize)size breakPoints:(NSArray<ZGBreakPoint *> *)breakPoints
 {
 	void *originalBytes = NULL;
 	if (!ZGReadBytes(processTask, address, &originalBytes, &size))
@@ -67,14 +66,14 @@
 	{
 		if (breakPoint.type == ZGBreakPointInstruction && breakPoint.task == processTask && breakPoint.variable.address >= address && breakPoint.variable.address < address + size)
 		{
-			memcpy(newBytes + (breakPoint.variable.address - address), breakPoint.variable.rawValue, sizeof(uint8_t));
+			memcpy((uint8_t *)newBytes + (breakPoint.variable.address - address), breakPoint.variable.rawValue, sizeof(uint8_t));
 		}
 	}
 	
 	return [NSData dataWithBytesNoCopy:newBytes length:size];
 }
 
-+ (BOOL)writeData:(NSData *)data atAddress:(ZGMemoryAddress)address processTask:(ZGMemoryMap)processTask breakPoints:(NSArray *)breakPoints
++ (BOOL)writeData:(NSData *)data atAddress:(ZGMemoryAddress)address processTask:(ZGMemoryMap)processTask breakPoints:(NSArray<ZGBreakPoint *> *)breakPoints
 {
 	BOOL success = YES;
 	pid_t processID = 0;
@@ -114,20 +113,20 @@
 			
 			if (address + data.length - targetBreakPoint.variable.address - 1 > 0)
 			{
-				if (!ZGWriteBytesIgnoringProtection(processTask, targetBreakPoint.variable.address + 1, data.bytes + (targetBreakPoint.variable.address + 1 - address), address + data.length - targetBreakPoint.variable.address - 1))
+				if (!ZGWriteBytesIgnoringProtection(processTask, targetBreakPoint.variable.address + 1, (const uint8_t *)data.bytes + (targetBreakPoint.variable.address + 1 - address), address + data.length - targetBreakPoint.variable.address - 1))
 				{
 					success = NO;
 				}
 			}
 			
-			*(uint8_t *)targetBreakPoint.variable.rawValue = *(uint8_t *)(data.bytes + targetBreakPoint.variable.address - address);
+			*(uint8_t *)targetBreakPoint.variable.rawValue = *((const uint8_t *)data.bytes + targetBreakPoint.variable.address - address);
 		}
 	}
 	
 	return success;
 }
 
-+ (void)writeStringValue:(NSString *)stringValue atAddress:(ZGMemoryAddress)address inProcess:(ZGProcess *)process breakPoints:(NSArray *)breakPoints
++ (void)writeStringValue:(NSString *)stringValue atAddress:(ZGMemoryAddress)address inProcess:(ZGProcess *)process breakPoints:(NSArray<ZGBreakPoint *> *)breakPoints
 {
 	ZGMemorySize newSize = 0;
 	void *newValue = ZGValueFromString(process.is64Bit, stringValue, ZGByteArray, &newSize);
@@ -156,7 +155,7 @@
 		NSString *outputFilePath = [fileManager stringWithFileSystemRepresentation:tempFileNameCString length:strlen(tempFileNameCString)];
 		
 		NSTask *task = [[NSTask alloc] init];
-		[task setLaunchPath:[[NSBundle mainBundle] pathForResource:@"yasm" ofType:nil]];
+		task.launchPath = [[[[NSBundle mainBundle] executablePath] stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"yasm"];
 		[task setArguments:@[@"--arch=x86", @"-", @"-o", outputFilePath]];
 		
 		NSPipe *inputPipe = [NSPipe pipe];
@@ -176,7 +175,8 @@
 			failedToLaunchTask = YES;
 			if (error != nil)
 			{
-				*error = [NSError errorWithDomain:ASSEMBLER_ERROR_DOMAIN code:kCFStreamErrorDomainCustom userInfo:@{@"description" : [NSString stringWithFormat:@"%@: Name: %@, Reason: %@", ZGLocalizedStringFromDebuggerTable(@"failedLaunchYasm"), exception.name, exception.reason], @"reason" : exception.reason}];
+				NSString *exceptionReason = exception.reason != nil ? exception.reason : @"";
+				*error = [NSError errorWithDomain:ASSEMBLER_ERROR_DOMAIN code:kCFStreamErrorDomainCustom userInfo:@{@"description" : [NSString stringWithFormat:@"%@: Name: %@, Reason: %@", ZGLocalizedStringFromDebuggerTable(@"failedLaunchYasm"), exception.name, exceptionReason], @"reason" : exceptionReason}];
 			}
 		}
 		
@@ -210,7 +210,7 @@
 				}
 				else
 				{
-					data = [NSData dataWithBytes:tempData.bytes + numberOfNoppedInstructions length:tempData.length - numberOfNoppedInstructions];
+					data = [NSData dataWithBytes:(const uint8_t *)tempData.bytes + numberOfNoppedInstructions length:tempData.length - numberOfNoppedInstructions];
 				}
 			}
 			else
@@ -239,7 +239,7 @@
 	return data;
 }
 
-+ (ZGDisassemblerObject *)disassemblerObjectWithProcessTask:(ZGMemoryMap)processTask pointerSize:(ZGMemorySize)pointerSize address:(ZGMemoryAddress)address size:(ZGMemorySize)size breakPoints:(NSArray *)breakPoints
++ (ZGDisassemblerObject *)disassemblerObjectWithProcessTask:(ZGMemoryMap)processTask pointerSize:(ZGMemorySize)pointerSize address:(ZGMemoryAddress)address size:(ZGMemorySize)size breakPoints:(NSArray<ZGBreakPoint *> *)breakPoints
 {
 	ZGDisassemblerObject *newObject = nil;
 	NSData *data = [self readDataWithProcessTask:processTask address:address size:size breakPoints:breakPoints];
@@ -252,7 +252,7 @@
 
 #pragma mark Finding Instructions
 
-+ (ZGInstruction *)findInstructionBeforeAddress:(ZGMemoryAddress)address inProcess:(ZGProcess *)process withBreakPoints:(NSArray *)breakPoints machBinaries:(NSArray *)machBinaries
++ (ZGInstruction *)findInstructionBeforeAddress:(ZGMemoryAddress)address inProcess:(ZGProcess *)process withBreakPoints:(NSArray<ZGBreakPoint *> *)breakPoints machBinaries:(NSArray<ZGMachBinary *> *)machBinaries
 {
 	ZGInstruction *instruction = nil;
 	
@@ -308,11 +308,11 @@
 #pragma mark Replacing Instructions
 
 + (void)
-replaceInstructions:(NSArray *)instructions
-fromOldStringValues:(NSArray *)oldStringValues
-toNewStringValues:(NSArray *)newStringValues
+replaceInstructions:(NSArray<ZGInstruction *> *)instructions
+fromOldStringValues:(NSArray<NSString *> *)oldStringValues
+toNewStringValues:(NSArray<NSString *> *)newStringValues
 inProcess:(ZGProcess *)process
-breakPoints:(NSArray *)breakPoints
+breakPoints:(NSArray<ZGBreakPoint *> *)breakPoints
 undoManager:(NSUndoManager *)undoManager
 actionName:(NSString *)actionName
 {
@@ -328,22 +328,25 @@ actionName:(NSString *)actionName
 		{
 			[undoManager setActionName:[actionName stringByAppendingFormat:@"%@", instructions.count == 1 ? @"" : @"s"]];
 		}
-		
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wobjc-messaging-id"
+		// There's no way that I know of to typecast to an obj-c class so you can send that instance a class message, rather than an instance level one.
 		[[undoManager prepareWithInvocationTarget:self] replaceInstructions:instructions fromOldStringValues:newStringValues toNewStringValues:oldStringValues inProcess:process breakPoints:breakPoints undoManager:undoManager actionName:actionName];
+#pragma clang diagnostic pop
 	}
 }
 
-+ (void)nopInstructions:(NSArray *)instructions inProcess:(ZGProcess *)process breakPoints:(NSArray *)breakPoints undoManager:(NSUndoManager *)undoManager actionName:(NSString *)actionName
++ (void)nopInstructions:(NSArray<ZGInstruction *> *)instructions inProcess:(ZGProcess *)process breakPoints:(NSArray<ZGBreakPoint *> *)breakPoints undoManager:(NSUndoManager *)undoManager actionName:(NSString *)actionName
 {
-	NSMutableArray *newStringValues = [[NSMutableArray alloc] init];
-	NSMutableArray *oldStringValues = [[NSMutableArray alloc] init];
+	NSMutableArray<NSString *> *newStringValues = [[NSMutableArray alloc] init];
+	NSMutableArray<NSString *> *oldStringValues = [[NSMutableArray alloc] init];
 	
 	for (NSUInteger instructionIndex = 0; instructionIndex < instructions.count; instructionIndex++)
 	{
 		ZGInstruction *instruction = [instructions objectAtIndex:instructionIndex];
 		[oldStringValues addObject:instruction.variable.stringValue];
 		
-		NSMutableArray *nopComponents = [[NSMutableArray alloc] init];
+		NSMutableArray<NSString *> *nopComponents = [[NSMutableArray alloc] init];
 		for (NSUInteger nopIndex = 0; nopIndex < instruction.variable.size; nopIndex++)
 		{
 			[nopComponents addObject:@"90"];
@@ -369,9 +372,9 @@ actionName:(NSString *)actionName
 + (BOOL)
 injectCode:(NSData *)codeData
 intoAddress:(ZGMemoryAddress)allocatedAddress
-hookingIntoOriginalInstructions:(NSArray *)hookedInstructions
+hookingIntoOriginalInstructions:(NSArray<ZGInstruction *> *)hookedInstructions
 process:(ZGProcess *)process
-breakPoints:(NSArray *)breakPoints
+breakPoints:(NSArray<ZGBreakPoint *> *)breakPoints
 undoManager:(NSUndoManager *)undoManager
 error:(NSError * __autoreleasing *)error
 {
@@ -398,6 +401,8 @@ error:(NSError * __autoreleasing *)error
 		return NO;
 	}
 	
+	free(nopBuffer);
+	
 	if (!ZGProtect(process.processTask, allocatedAddress, codeData.length, VM_PROT_READ | VM_PROT_EXECUTE))
 	{
 		ZG_LOG(@"Error: Failed to protect memory..");
@@ -406,7 +411,6 @@ error:(NSError * __autoreleasing *)error
 			*error = [NSError errorWithDomain:INJECT_ERROR_DOMAIN code:kCFStreamErrorDomainCustom userInfo:@{@"reason" : ZGLocalizedStringFromDebuggerTable(@"failedChangeMemoryProtectionForInjectingCode")}];
 		}
 		
-		free(nopBuffer);
 		ZGResumeTask(process.processTask);
 		return NO;
 	}
@@ -433,7 +437,6 @@ error:(NSError * __autoreleasing *)error
 		if (popRaxData.length == 0)
 		{
 			ZG_LOG(@"Error: Failed to assemble pop rax");
-			free(nopBuffer);
 			ZGResumeTask(process.processTask);
 			return NO;
 		}
@@ -456,14 +459,13 @@ error:(NSError * __autoreleasing *)error
 	if (jumpToIslandData.length == 0)
 	{
 		ZG_LOG(@"Error generating jumpToIslandData");
-		free(nopBuffer);
 		ZGResumeTask(process.processTask);
 		return NO;
 	}
 	
 	ZGVariable *variable =
 	[[ZGVariable alloc]
-	 initWithValue:(void *)jumpToIslandData.bytes
+	 initWithValue:jumpToIslandData.bytes
 	 size:jumpToIslandData.length
 	 address:firstInstruction.variable.address
 	 type:ZGByteArray
@@ -489,7 +491,6 @@ error:(NSError * __autoreleasing *)error
 	if (jumpFromIslandData.length == 0)
 	{
 		ZG_LOG(@"Error generating jumpFromIslandData");
-		free(nopBuffer);
 		ZGResumeTask(process.processTask);
 		return NO;
 	}
@@ -502,15 +503,15 @@ error:(NSError * __autoreleasing *)error
 	return YES;
 }
 
-+ (NSArray *)instructionsBeforeHookingIntoAddress:(ZGMemoryAddress)address injectingIntoDestination:(ZGMemoryAddress)destinationAddress inProcess:(ZGProcess *)process withBreakPoints:(NSArray *)breakPoints
++ (NSArray<ZGInstruction *> *)instructionsBeforeHookingIntoAddress:(ZGMemoryAddress)address injectingIntoDestination:(ZGMemoryAddress)destinationAddress inProcess:(ZGProcess *)process withBreakPoints:(NSArray<ZGBreakPoint *> *)breakPoints
 {
 	int consumedLength =
 	[self shouldInjectCodeWithRelativeBranchingWithProcess:process sourceAddress:address destinationAddress:destinationAddress] ?
 	JUMP_REL32_INSTRUCTION_LENGTH :
 	INDIRECT_JUMP_INSTRUCTIONS_LENGTH;
 	
-	NSArray *machBinaries = [ZGMachBinary machBinariesInProcess:process];
-	NSMutableArray *instructions = [[NSMutableArray alloc] init];
+	NSArray<ZGMachBinary *> *machBinaries = [ZGMachBinary machBinariesInProcess:process];
+	NSMutableArray<ZGInstruction *> *instructions = [[NSMutableArray alloc] init];
 	while (consumedLength > 0)
 	{
 		ZGInstruction *newInstruction = [self findInstructionBeforeAddress:address+1 inProcess:process withBreakPoints:breakPoints machBinaries:machBinaries];

@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 10/29/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,7 +33,7 @@
 #import "ZGMachBinary.h"
 #import "ZGProcess.h"
 #import "ZGVirtualMemory.h"
-#import "ZGVirtualMemoryHelpers.h"
+#import "ZGVirtualMemoryStringReading.h"
 #import "ZGRegion.h"
 #import "ZGMachBinaryInfo.h"
 
@@ -89,11 +87,11 @@ NSString * const ZGFailedImageName = @"ZGFailedImageName";
 		}
 		
 		machHeader = regionBytes;
-		void *bytes = (void *)machHeader + ((machHeader->magic == MH_MAGIC) ? sizeof(struct mach_header) : sizeof(struct mach_header_64));
+		uint8_t *bytes = (uint8_t *)(void *)machHeader + ((machHeader->magic == MH_MAGIC) ? sizeof(struct mach_header) : sizeof(struct mach_header_64));
 		
 		for (uint32_t commandIndex = 0; commandIndex < machHeader->ncmds; commandIndex++)
 		{
-			struct dylinker_command *dylinkerCommand = bytes;
+			struct dylinker_command *dylinkerCommand = (void *)bytes;
 			
 			if (dylinkerCommand->cmd == LC_ID_DYLINKER || dylinkerCommand->cmd == LC_LOAD_DYLINKER)
 			{
@@ -118,13 +116,13 @@ NSString * const ZGFailedImageName = @"ZGFailedImageName";
 	return dylinkerBinary;
 }
 
-+ (NSArray *)machBinariesInProcess:(ZGProcess *)process
++ (NSArray<ZGMachBinary *> *)machBinariesInProcess:(ZGProcess *)process
 {
 	ZGMachBinary *dylinkerBinary = process.dylinkerBinary;
 	ZGMemorySize pointerSize = process.pointerSize;
 	ZGMemoryMap processTask = process.processTask;
 	
-	NSMutableArray *machBinaries = [[NSMutableArray alloc] init];
+	NSMutableArray<ZGMachBinary *> *machBinaries = [[NSMutableArray alloc] init];
 	
 	struct task_dyld_info dyld_info;
 	mach_msg_type_number_t count = TASK_DYLD_INFO_COUNT;
@@ -144,11 +142,11 @@ NSString * const ZGFailedImageName = @"ZGFailedImageName";
 			{
 				for (uint32_t infoIndex = 0; infoIndex < allImageInfos->infoArrayCount; infoIndex++)
 				{
-					void *infoImage = infoArrayBytes + imageInfoSize * infoIndex;
+					void *infoImage = (uint8_t *)infoArrayBytes + imageInfoSize * infoIndex;
 					
 					ZGMemoryAddress machHeaderAddress = (pointerSize == sizeof(ZG32BitMemoryAddress)) ? *(ZG32BitMemoryAddress *)infoImage : *(ZGMemoryAddress *)infoImage;
 					
-					ZGMemoryAddress imageFilePathAddress = (pointerSize == sizeof(ZG32BitMemoryAddress)) ? *(ZG32BitMemoryAddress *)(infoImage + pointerSize) : *(ZGMemoryAddress *)(infoImage + pointerSize);
+					ZGMemoryAddress imageFilePathAddress = (pointerSize == sizeof(ZG32BitMemoryAddress)) ? *(ZG32BitMemoryAddress *)(void *)((uint8_t *)infoImage + pointerSize) : *(ZGMemoryAddress *)(void *)((uint8_t *)infoImage + pointerSize);
 					
 					[machBinaries addObject:[[ZGMachBinary alloc] initWithHeaderAddress:machHeaderAddress filePathAddress:imageFilePathAddress]];
 				}
@@ -163,12 +161,12 @@ NSString * const ZGFailedImageName = @"ZGFailedImageName";
 	return [machBinaries sortedArrayUsingSelector:@selector(compare:)];
 }
 
-+ (instancetype)mainMachBinaryFromMachBinaries:(NSArray *)machBinaries
++ (instancetype)mainMachBinaryFromMachBinaries:(NSArray<ZGMachBinary *> *)machBinaries
 {
 	return machBinaries.firstObject;
 }
 
-+ (instancetype)machBinaryNearestToAddress:(ZGMemoryAddress)address fromMachBinaries:(NSArray *)machBinaries
++ (instancetype)machBinaryNearestToAddress:(ZGMemoryAddress)address fromMachBinaries:(NSArray<ZGMachBinary *> *)machBinaries
 {
 	ZGMachBinary *previousMachBinary = nil;
 	
@@ -182,9 +180,9 @@ NSString * const ZGFailedImageName = @"ZGFailedImageName";
 	return previousMachBinary;
 }
 
-+ (instancetype)machBinaryWithPartialImageName:(NSString *)partialImageName inProcess:(ZGProcess *)process fromCachedMachBinaries:(NSArray *)machBinaries error:(NSError * __autoreleasing *)error
++ (instancetype)machBinaryWithPartialImageName:(NSString *)partialImageName inProcess:(ZGProcess *)process fromCachedMachBinaries:(NSArray<ZGMachBinary *> *)machBinaries error:(NSError * __autoreleasing *)error
 {
-	NSMutableDictionary *mappedPathDictionary = [process.cacheDictionary objectForKey:ZGMachBinaryPathToBinaryDictionary];
+	NSMutableDictionary<NSString *, ZGMachBinary *> *mappedPathDictionary = process.cacheDictionary[ZGMachBinaryPathToBinaryDictionary];
 	ZGMachBinary *foundMachBinary = [mappedPathDictionary objectForKey:partialImageName];
 	
 	if (foundMachBinary == nil)
@@ -264,16 +262,16 @@ NSString * const ZGFailedImageName = @"ZGFailedImageName";
 
 - (NSComparisonResult)compare:(ZGMachBinary *)binaryImage
 {
-	return [@(self.headerAddress) compare:@(binaryImage.headerAddress)];
+	return [@(_headerAddress) compare:@(binaryImage.headerAddress)];
 }
 
 - (NSString *)filePathInProcess:(ZGProcess *)process
 {
 	NSString *filePath = nil;
 	ZGMemoryMap processTask = process.processTask;
-	ZGMemorySize pathSize = ZGGetStringSize(processTask, self.filePathAddress, ZGString8, 200, PATH_MAX);
+	ZGMemorySize pathSize = ZGGetStringSize(processTask, _filePathAddress, ZGString8, 200, PATH_MAX);
 	void *filePathBytes = NULL;
-	if (ZGReadBytes(processTask, self.filePathAddress, &filePathBytes, &pathSize))
+	if (ZGReadBytes(processTask, _filePathAddress, &filePathBytes, &pathSize))
 	{
 		filePath = [[NSString alloc] initWithBytes:filePathBytes length:pathSize encoding:NSUTF8StringEncoding];
 		ZGFreeBytes(filePathBytes, pathSize);
@@ -283,20 +281,20 @@ NSString * const ZGFailedImageName = @"ZGFailedImageName";
 
 - (ZGMachBinaryInfo *)parseMachHeaderWithBytes:(const void *)machHeaderBytes startPointer:(const void *)startPointer dataLength:(ZGMemorySize)dataLength pointerSize:(size_t)pointerSize
 {
-	ZGMemoryAddress machHeaderAddress = self.headerAddress;
+	ZGMemoryAddress machHeaderAddress = _headerAddress;
 	
 	const struct mach_header_64 *machHeader = machHeaderBytes;
 	
 	// If this is a fat binary that is being loaded from disk, we'll need to find our target architecture
 	if (machHeader->magic == FAT_CIGAM) // not checking FAT_MAGIC, only interested in little endian
 	{
-		uint32_t numberOfArchitectures = CFSwapInt32BigToHost(((struct fat_header *)machHeader)->nfat_arch);
+		uint32_t numberOfArchitectures = CFSwapInt32BigToHost(((const struct fat_header *)machHeader)->nfat_arch);
 		for (uint32_t architectureIndex = 0; architectureIndex < numberOfArchitectures; architectureIndex++)
 		{
-			struct fat_arch *fatArchitecture = (void *)machHeader + sizeof(struct fat_header) + sizeof(struct fat_arch) * architectureIndex;
+			const struct fat_arch *fatArchitecture = (const void *)(((const uint8_t *)(const void *)machHeader) + sizeof(struct fat_header) + sizeof(struct fat_arch) * architectureIndex);
 			if ((pointerSize == sizeof(ZGMemoryAddress) && fatArchitecture->cputype & CPU_TYPE_X86_64) || (pointerSize == sizeof(ZG32BitMemoryAddress) && fatArchitecture->cputype & CPU_TYPE_I386))
 			{
-				machHeader = (void *)machHeader + CFSwapInt32BigToHost(fatArchitecture->offset);
+				machHeader = (const void *)(((const uint8_t *)(const void *)machHeader) + CFSwapInt32BigToHost(fatArchitecture->offset));
 				break;
 			}
 		}
@@ -306,8 +304,8 @@ NSString * const ZGFailedImageName = @"ZGFailedImageName";
 	
 	if (machHeader->magic == MH_MAGIC || machHeader->magic == MH_MAGIC_64)
 	{
-		void *segmentBytes = (void *)machHeader + ((machHeader->magic == MH_MAGIC) ? sizeof(struct mach_header) : sizeof(struct mach_header_64));
-		if (segmentBytes + machHeader->sizeofcmds <= startPointer + dataLength)
+		const void *segmentBytes = ((const uint8_t *)(const void *)machHeader) + ((machHeader->magic == MH_MAGIC) ? sizeof(struct mach_header) : sizeof(struct mach_header_64));
+		if ((const uint8_t *)segmentBytes + machHeader->sizeofcmds <= (const uint8_t *)startPointer + dataLength)
 		{
 			machBinaryInfo = [[ZGMachBinaryInfo alloc] initWithMachHeaderAddress:machHeaderAddress segmentBytes:segmentBytes commandSize:machHeader->sizeofcmds];
 		}
@@ -318,7 +316,7 @@ NSString * const ZGFailedImageName = @"ZGFailedImageName";
 
 - (ZGMachBinaryInfo *)machBinaryInfoFromFilePath:(NSString *)filePath process:(ZGProcess *)process
 {
-	NSMutableDictionary *machPathToInfoDictionary = [process.cacheDictionary objectForKey:ZGMachBinaryPathToBinaryInfoDictionary];
+	NSMutableDictionary<NSString *, ZGMachBinaryInfo *> *machPathToInfoDictionary = process.cacheDictionary[ZGMachBinaryPathToBinaryInfoDictionary];
 	
 	ZGMachBinaryInfo *binaryInfo = [machPathToInfoDictionary objectForKey:filePath];
 	
@@ -342,16 +340,16 @@ NSString * const ZGFailedImageName = @"ZGFailedImageName";
 {
 	ZGMachBinaryInfo *binaryInfo = nil;
 	
-	ZGMemoryAddress regionAddress = self.headerAddress;
+	ZGMemoryAddress regionAddress = _headerAddress;
 	ZGMemorySize regionSize = 0x1;
 	ZGMemoryBasicInfo unusedInfo;
 	
-	if (ZGRegionInfo(process.processTask, &regionAddress, &regionSize, &unusedInfo) && self.headerAddress >= regionAddress && self.headerAddress < regionAddress + regionSize)
+	if (ZGRegionInfo(process.processTask, &regionAddress, &regionSize, &unusedInfo) && _headerAddress >= regionAddress && _headerAddress < regionAddress + regionSize)
 	{
 		void *regionBytes = NULL;
 		if (ZGReadBytes(process.processTask, regionAddress, &regionBytes, &regionSize))
 		{
-			const struct mach_header_64 *machHeader = regionBytes + self.headerAddress - regionAddress;
+			const struct mach_header_64 *machHeader = (void *)((uint8_t *)regionBytes + _headerAddress - regionAddress);
 			binaryInfo = [self parseMachHeaderWithBytes:machHeader startPointer:regionBytes dataLength:regionSize pointerSize:process.pointerSize];
 			
 			ZGFreeBytes(regionBytes, regionSize);

@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 8/25/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,10 +31,11 @@
  */
 
 #import <Foundation/Foundation.h>
-#import "Python.h"
+#import "Python/Python.h"
 #import "VDKQueue.h"
 #import "ZGMemoryTypes.h"
 #import "ZGRegisterEntries.h"
+#import "ZGScriptPromptDelegate.h"
 
 @class ZGDocumentWindowController;
 @class ZGVariable;
@@ -44,26 +43,27 @@
 @class ZGBreakPoint;
 @class ZGRegistersState;
 @class ZGAppTerminationState;
+@class ZGScriptPrompt;
 
-#define SCRIPT_EVALUATION_ERROR_REASON @"Reason"
 #define SCRIPT_PYTHON_ERROR @"SCRIPT_PYTHON_ERROR"
 
-extern dispatch_queue_t gPythonQueue;
+#define ZGScriptNotificationTypeKey @"script_type"
+#define ZGScriptNotificationPromptHashKey @"ZGScriptNotificationPromptHashKey"
+
+NS_ASSUME_NONNULL_BEGIN
 
 extern NSString *ZGScriptDefaultApplicationEditorKey;
 
-@interface ZGScriptManager : NSObject <VDKQueueDelegate>
-
-+ (PyObject *)compiledExpressionFromExpression:(NSString *)expression error:(NSError * __autoreleasing *)error;
-
-+ (BOOL)evaluateCondition:(PyObject *)compiledExpression process:(ZGProcess *)process registerEntries:(ZGRegisterEntry *)registerEntries error:(NSError **)error;
+@interface ZGScriptManager : NSObject <VDKQueueDelegate, NSUserNotificationCenterDelegate>
 
 - (id)initWithWindowController:(ZGDocumentWindowController *)windowController;
 
 - (void)cleanup;
 - (void)cleanupWithAppTerminationState:(ZGAppTerminationState *)appTerminationState;
 
-- (void)loadCachedScriptsFromVariables:(NSArray *)variables;
+- (void)triggerCurrentProcessChanged;
+
+- (void)loadCachedScriptsFromVariables:(NSArray<ZGVariable *> *)variables;
 
 - (void)openScriptForVariable:(ZGVariable *)variable;
 
@@ -71,9 +71,16 @@ extern NSString *ZGScriptDefaultApplicationEditorKey;
 - (void)stopScriptForVariable:(ZGVariable *)variable;
 - (void)removeScriptForVariable:(ZGVariable *)variable;
 
+- (BOOL)hasAttachedPrompt;
+- (void)showScriptPrompt:(ZGScriptPrompt *)scriptPrompt delegate:(id <ZGScriptPromptDelegate>)delegate;
+- (void)handleScriptPrompt:(ZGScriptPrompt *)scriptPrompt withAnswer:(NSString *)answer sender:(id)sender;
+- (void)handleScriptPromptHash:(NSNumber *)scriptPromptHash withUserNotificationReply:(nullable NSString *)reply;
+
 - (void)handleDataAddress:(ZGMemoryAddress)dataAddress accessedFromInstructionAddress:(ZGMemoryAddress)instructionAddress registersState:(ZGRegistersState *)registersState callback:(PyObject *)callback sender:(id)sender;
-- (void)handleInstructionBreakPoint:(ZGBreakPoint *)breakPoint withRegistersState:(ZGRegistersState *)registersState callback:(PyObject *)callback sender:(id)sender;
+- (void)handleInstructionBreakPoint:(ZGBreakPoint *)breakPoint withRegistersState:(ZGRegistersState *)registersState callback:(nullable PyObject *)callback sender:(id)sender;
 
 - (void)handleHotKeyTriggerWithInternalID:(UInt32)hotKeyID callback:(PyObject *)callback sender:(id)sender;
 
 @end
+
+NS_ASSUME_NONNULL_END

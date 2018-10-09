@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 3/8/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,47 +31,53 @@
  */
 
 #import <Cocoa/Cocoa.h>
+#import "ZGChosenProcessDelegate.h"
+#import "ZGMemorySelectionDelegate.h"
+#import "ZGShowMemoryWindow.h"
 #import "ZGMemoryTypes.h"
 #import <HexFiend/HFTypes.h>
 #import <HexFiend/HFFunctions.h>
 
-extern NSString *ZGLastChosenInternalProcessNameNotification;
-extern NSString *ZGLastChosenInternalProcessNameKey;
-
 @class ZGProcess;
 @class ZGProcessTaskManager;
+@class ZGRootlessConfiguration;
 @class ZGProcessList;
+@class ZGBreakPoint;
 
 @interface ZGMemoryWindowController : NSWindowController
-{
-	ZGProcess *_currentProcess;
-}
+
+NS_ASSUME_NONNULL_BEGIN
 
 + (void)pauseOrUnpauseProcessTask:(ZGMemoryMap)processTask;
 
-- (id)initWithProcessTaskManager:(ZGProcessTaskManager *)processTaskManager;
+- (id)initWithProcessTaskManager:(ZGProcessTaskManager *)processTaskManager rootlessConfiguration:(nullable ZGRootlessConfiguration *)rootlessConfiguration delegate:(nullable id <ZGChosenProcessDelegate, ZGMemorySelectionDelegate, ZGShowMemoryWindow>)delegate;
 
-@property (nonatomic) ZGProcessTaskManager *processTaskManager;
-@property (nonatomic) ZGProcessList *processList;
+@property (nonatomic, readonly) ZGProcessTaskManager *processTaskManager;
+@property (nonatomic, readonly) ZGProcessList *processList;
+@property (nonatomic, readonly, nullable) ZGRootlessConfiguration *rootlessConfiguration;
 
-@property (nonatomic, copy) NSString *lastChosenInternalProcessName;
+@property (nonatomic, weak, readonly, nullable) id <ZGChosenProcessDelegate, ZGMemorySelectionDelegate, ZGShowMemoryWindow> delegate;
 
-@property (nonatomic, assign) id debuggerController;
+@property (nonatomic, copy, nullable) NSString *lastChosenInternalProcessName;
 
-@property (nonatomic, assign) IBOutlet NSPopUpButton *runningApplicationsPopUpButton;
+@property (nonatomic) IBOutlet NSPopUpButton *runningApplicationsPopUpButton;
 
-@property (nonatomic) NSUndoManager *undoManager;
+@property (nonatomic, readonly) NSUndoManager *undoManager;
 
+// Mutator method can be overridden
 @property (nonatomic) ZGProcess *currentProcess;
-@property (nonatomic, copy) NSString *desiredProcessInternalName;
 
-@property (nonatomic) NSTimer *updateDisplayTimer;
+// Mutator method can be overridden
+@property (nonatomic, copy, nullable) NSString *desiredProcessInternalName;
 
 @property (nonatomic, readonly) BOOL isOccluded;
 
 - (void)cleanup;
 
 - (IBAction)pauseOrUnpauseProcess:(id)sender;
+
+- (BOOL)isProcessIdentifier:(pid_t)processIdentifier inHaltedBreakPoints:(NSArray<ZGBreakPoint *> *)haltedBreakPoints;
+- (BOOL)isProcessIdentifierHalted:(pid_t)processIdentifier; // should be overridden
 
 - (void)updateWindow;
 
@@ -89,20 +93,22 @@ extern NSString *ZGLastChosenInternalProcessNameKey;
 - (void)startProcessActivity;
 - (void)stopProcessActivity;
 
-- (void)currentProcessChangedWithOldProcess:(ZGProcess *)oldProcess newProcess:(ZGProcess *)newProcess;
-- (void)processListChanged:(NSDictionary *)change;
+- (void)currentProcessChangedWithOldProcess:(nullable ZGProcess *)oldProcess newProcess:(ZGProcess *)newProcess;
+- (void)processListChanged:(NSDictionary<NSString *, id> *)change;
 - (void)updateRunningProcesses;
 - (void)runningApplicationsPopUpButtonWillPopUp:(NSNotification *)notification;
 
 - (void)switchProcess;
 
-- (IBAction)runningApplicationsPopUpButton:(id)__unused sender;
+- (IBAction)runningApplicationsPopUpButton:(nullable id)__unused sender;
 
 - (BOOL)validateUserInterfaceItem:(id <NSValidatedUserInterfaceItem>)userInterfaceItem;
 
 - (HFRange)preferredMemoryRequestRange;
-- (IBAction)dumpAllMemory:(id)sender;
-- (IBAction)dumpMemoryInRange:(id)sender;
-- (IBAction)changeMemoryProtection:(id)sender;
+- (IBAction)dumpAllMemory:(nullable id)sender;
+- (IBAction)dumpMemoryInRange:(nullable id)sender;
+- (IBAction)changeMemoryProtection:(nullable id)sender;
+
+NS_ASSUME_NONNULL_END
 
 @end

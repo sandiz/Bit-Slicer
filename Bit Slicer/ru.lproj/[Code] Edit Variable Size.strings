@@ -1,0 +1,11 @@
+/* Alert title indicating that the requested size is invalid */
+"invalidSizeAlertTitle" = "Неверный Размер";
+
+/* Alert message indicating that the requested size is invalid */
+"invalidSizeAlertMessage" = "Задан неверный размер.";
+
+/* Alert title indicating that the requested size is too small */
+"sizeIsTooSmallAlertTitle" = "Размер слишком мал";
+
+/* Alert message indicating that the requested size is too small */
+"sizeIsTooSmallAlertMessage" = "Размер должен быть больше чем 0.";

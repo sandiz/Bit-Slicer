@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 1/31/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,7 +33,7 @@
 #import <Foundation/Foundation.h>
 #import "ZGVariableTypes.h"
 
-typedef enum
+typedef NS_ENUM(NSInteger, ZGFunctionType)
 {
 	// Regular comparisons
 	ZGEquals = 0,
@@ -52,7 +50,7 @@ typedef enum
 	ZGNotEqualsStoredLinear,
 	ZGGreaterThanStoredLinear,
 	ZGLessThanStoredLinear
-} ZGFunctionType;
+};
 
 BOOL ZGIsFunctionTypeStore(ZGFunctionType functionType);
 

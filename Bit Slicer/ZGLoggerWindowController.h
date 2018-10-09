@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 9/2/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,8 +32,12 @@
 
 #import <Cocoa/Cocoa.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface ZGLoggerWindowController : NSWindowController
 
-- (void)writeLine:(NSString *)text;
+- (void)writeLine:(nullable NSString *)text;
 
 @end
+
+NS_ASSUME_NONNULL_END

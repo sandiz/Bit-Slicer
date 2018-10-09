@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 9/5/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,26 +31,31 @@
  */
 
 #import <Foundation/Foundation.h>
-#import "Python.h"
+#import "Python/Python.h"
 #import "ZGMemoryTypes.h"
 #import "ZGBreakPointDelegate.h"
 #import "ZGHotKeyDelegate.h"
+#import "ZGScriptPromptDelegate.h"
 
+@class ZGScriptingInterpreter;
 @class ZGScriptManager;
 @class ZGProcess;
 @class ZGBreakPointController;
 @class ZGLoggerWindowController;
 @class ZGHotKeyCenter;
 
-@interface ZGPyDebugger : NSObject <ZGBreakPointDelegate, ZGHotKeyDelegate>
+NS_ASSUME_NONNULL_BEGIN
 
-@property (nonatomic, assign) ZGScriptManager *scriptManager;
+@interface ZGPyDebugger : NSObject <ZGBreakPointDelegate, ZGHotKeyDelegate, ZGScriptPromptDelegate>
 
-+ (void)loadPythonClassInMainModule:(PyObject *)module;
++ (nullable PyObject *)loadPythonClassInMainModule:(PyObject *)module;
 
-- (id)initWithProcess:(ZGProcess *)process scriptManager:(ZGScriptManager *)scriptManager breakPointController:(ZGBreakPointController *)breakPointController hotKeyCenter:(ZGHotKeyCenter *)hotKeyCenter loggerWindowController:(ZGLoggerWindowController *)loggerWindowController;
+- (nullable id)initWithProcess:(ZGProcess *)process scriptingInterpreter:(ZGScriptingInterpreter *)scriptingInterpreter scriptManager:(ZGScriptManager *)scriptManager breakPointController:(ZGBreakPointController *)breakPointController hotKeyCenter:(ZGHotKeyCenter *)hotKeyCenter loggerWindowController:(ZGLoggerWindowController *)loggerWindowController;
 - (void)cleanup;
 
-@property (nonatomic, assign) PyObject *object;
+@property (nonatomic, weak, readonly) ZGScriptManager *scriptManager;
+@property (nonatomic, readonly, nullable) PyObject *object;
 
 @end
+
+NS_ASSUME_NONNULL_END

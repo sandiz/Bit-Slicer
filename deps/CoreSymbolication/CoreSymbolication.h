@@ -43,9 +43,9 @@
 //  - a Symbol represents a symbol e.g. function, variable
 //
 
-#if !defined(__CORESYMBOLICATION_CORESYMBOLICATION__)
-#define __CORESYMBOLICATION_CORESYMBOLICATION__ 1
-#define __CORESYMBOLICATION__ 1
+#if !defined(CS_CORESYMBOLICATION_CORESYMBOLICATION__)
+#define CS_CORESYMBOLICATION_CORESYMBOLICATION__ 1
+#define CS_CORESYMBOLICATION_CORESYMBOLICATION__ 1
 
 
 #include <CoreFoundation/CoreFoundation.h>
@@ -58,7 +58,11 @@
  * Defines
  */
 #define kCSNull								((CSTypeRef) {NULL, NULL})
-#define kCSNow								0x80000000u
+
+//#define kCSNow								0x80000000u
+// See https://github.com/mountainstorm/CoreSymbolication/issues/2
+#define kCSNow								0x8000000000000000llu
+
 // we've no idea what value kCSSymbolOwnerDataFoundDsym has; its only use in dtrace has been optimised out
 #define kCSSymbolOwnerDataFoundDsym			0
 #define kCSSymbolOwnerIsAOut				0

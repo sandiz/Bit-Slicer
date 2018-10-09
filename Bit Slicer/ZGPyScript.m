@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 8/25/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,7 +39,7 @@
 	self = [super init];
 	if (self != nil)
 	{
-		self.path = path;
+		_path = [path copy];
 	}
 	return self;
 }
@@ -52,13 +50,12 @@
 	{
 		Py_XDECREF(_executeFunction);
 	}
-	
 	_executeFunction = executeFunction;
 }
 
 - (NSString *)moduleName
 {
-	return [[self.path lastPathComponent] stringByDeletingPathExtension];
+	return [[_path lastPathComponent] stringByDeletingPathExtension];
 }
 
 - (void)setModule:(PyObject *)module

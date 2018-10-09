@@ -1,8 +1,8 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="5056" systemVersion="13E28" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none">
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="11762" systemVersion="16D32" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none">
     <dependencies>
-        <deployment defaultVersion="1080" identifier="macosx"/>
-        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="5056"/>
+        <deployment identifier="macosx"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="11762"/>
     </dependencies>
     <objects>
         <customObject id="-2" userLabel="File's Owner" customClass="NSApplication">
@@ -11,7 +11,7 @@
             </connections>
         </customObject>
         <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
-        <customObject id="-3" userLabel="Application"/>
+        <customObject id="-3" userLabel="Application" customClass="NSObject"/>
         <menu title="AMainMenu" systemMenu="main" id="29">
             <items>
                 <menuItem title="Bit Slicer" id="56">
@@ -20,13 +20,7 @@
                             <menuItem title="About Bit Slicer" id="58">
                                 <modifierMask key="keyEquivalentModifierMask"/>
                                 <connections>
-                                    <action selector="orderFrontStandardAboutPanel:" target="-2" id="142"/>
-                                </connections>
-                            </menuItem>
-                            <menuItem title="Donate…" id="sUz-q6-lOh">
-                                <modifierMask key="keyEquivalentModifierMask"/>
-                                <connections>
-                                    <action selector="openDonationURL:" target="695" id="DH1-Qm-Def"/>
+                                    <action selector="openAboutWindow:" target="695" id="VwA-dW-qwf"/>
                                 </connections>
                             </menuItem>
                             <menuItem isSeparatorItem="YES" id="236">
@@ -719,25 +713,10 @@ CA
                                     <action selector="help:" target="695" id="770"/>
                                 </connections>
                             </menuItem>
-                            <menuItem isSeparatorItem="YES" id="1111">
-                                <modifierMask key="keyEquivalentModifierMask" command="YES"/>
-                            </menuItem>
                             <menuItem title="Report a Bug" id="1110">
                                 <modifierMask key="keyEquivalentModifierMask"/>
                                 <connections>
                                     <action selector="reportABug:" target="695" id="1114"/>
-                                </connections>
-                            </menuItem>
-                            <menuItem title="Send Feedback" id="1113">
-                                <modifierMask key="keyEquivalentModifierMask"/>
-                                <connections>
-                                    <action selector="sendFeedback:" target="695" id="1115"/>
-                                </connections>
-                            </menuItem>
-                            <menuItem title="Visit Forums" id="1112">
-                                <modifierMask key="keyEquivalentModifierMask"/>
-                                <connections>
-                                    <action selector="visitForums:" target="695" id="1116"/>
                                 </connections>
                             </menuItem>
                         </items>
@@ -746,6 +725,12 @@ CA
             </items>
         </menu>
         <customObject id="419" customClass="NSFontManager"/>
-        <customObject id="695" customClass="ZGAppController"/>
+        <customObject id="695" customClass="ZGAppController">
+            <connections>
+                <outlet property="_fileMenu" destination="81" id="z29-58-6oQ"/>
+                <outlet property="_newDocumentMenuItem" destination="82" id="7xw-87-BcJ"/>
+                <outlet property="_showFontsMenuItem" destination="196-mO-a1w" id="nyT-PT-bA7"/>
+            </connections>
+        </customObject>
     </objects>
 </document>

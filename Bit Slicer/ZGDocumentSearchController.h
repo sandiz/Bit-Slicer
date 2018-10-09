@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 7/21/12.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,25 +37,23 @@
 
 #define USER_INTERFACE_UPDATE_TIME_INTERVAL	 0.33
 
-@class ZGSearchData;
 @class ZGSearchProgress;
 @class ZGSearchResults;
 @class ZGDocumentWindowController;
-@class ZGDocumentData;
 
 #define MAX_NUMBER_OF_VARIABLES_TO_FETCH ((NSUInteger)1000)
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface ZGDocumentSearchController : NSObject <ZGSearchProgressDelegate>
 
-@property (assign, nonatomic) ZGDocumentData *documentData;
-@property (assign, nonatomic) ZGSearchData *searchData;
-@property (strong, nonatomic) ZGSearchResults *searchResults;
-@property (readonly, strong, nonatomic) ZGSearchProgress *searchProgress;
-
-+ (BOOL)hasStoredValueTokenFromExpression:(NSString *)expression isLinearlyExpressed:(BOOL *)isLinearlyExpressedReference;
++ (BOOL)hasStoredValueTokenFromExpression:(NSString *)expression isLinearlyExpressed:(nullable BOOL *)isLinearlyExpressedReference;
 + (BOOL)hasStoredValueTokenFromExpression:(NSString *)expression;
 
 - (id)initWithWindowController:(ZGDocumentWindowController *)windowController;
+
+@property (nonatomic, nullable) ZGSearchResults *searchResults;
+@property (nonatomic, readonly) ZGSearchProgress *searchProgress;
 
 - (BOOL)canStartTask;
 - (BOOL)canCancelTask;
@@ -75,3 +71,5 @@
 - (void)cleanUp;
 
 @end
+
+NS_ASSUME_NONNULL_END

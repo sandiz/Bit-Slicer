@@ -20,11 +20,14 @@
 //	   distribution.
 
 #import "VDKQueue.h"
+#import <Cocoa/Cocoa.h>
 #import <unistd.h>
 #import <fcntl.h>
 #include <sys/stat.h>
 
-
+#ifndef DEBUG_LOG_THREAD_LIFETIME
+#define DEBUG_LOG_THREAD_LIFETIME 0
+#endif
 
 NSString * VDKQueueRenameNotification = @"VDKQueueFileRenamedNotification";
 NSString * VDKQueueWriteNotification = @"VDKQueueFileWrittenToNotification";
@@ -43,11 +46,6 @@ NSString * VDKQueueAccessRevocationNotification = @"VDKQueueAccessWasRevokedNoti
 
 //  This is a simple model class used to hold info about each path we watch.
 @interface VDKQueuePathEntry : NSObject
-{
-	NSString*		_path;
-	int				_watchedFD;
-	u_int			_subscriptionFlags;
-}
 
 - (id) initWithPath:(NSString*)inPath andSubscriptionFlags:(u_int)flags;
 
@@ -58,6 +56,12 @@ NSString * VDKQueueAccessRevocationNotification = @"VDKQueueAccessWasRevokedNoti
 @end
 
 @implementation VDKQueuePathEntry
+{
+	NSString*		_path;
+	int				_watchedFD;
+	u_int			_subscriptionFlags;
+}
+
 @synthesize path = _path, watchedFD = _watchedFD, subscriptionFlags = _subscriptionFlags;
 
 
@@ -113,6 +117,16 @@ NSString * VDKQueueAccessRevocationNotification = @"VDKQueueAccessWasRevokedNoti
 
 
 @implementation VDKQueue
+{
+	id<VDKQueueDelegate>    _delegate;
+	BOOL                    _alwaysPostNotifications;               // By default, notifications are posted only if there is no delegate set. Set this value to YES to have notes posted even when there is a delegate.
+	
+@private
+	int						_coreQueueFD;                           // The actual kqueue ID (Unix file descriptor).
+	NSMutableDictionary    *_watchedPathEntries;                    // List of VDKQueuePathEntries. Keys are NSStrings of the path that each VDKQueuePathEntry is for.
+	BOOL                    _keepWatcherThreadRunning;              // Set to NO to cancel the thread that watches _coreQueueFD for kQueue events
+}
+
 @synthesize delegate = _delegate, alwaysPostNotifications = _alwaysPostNotifications;
 
 
@@ -251,7 +265,7 @@ NSString * VDKQueueAccessRevocationNotification = @"VDKQueueAccessWasRevokedNoti
                         //        object attached as the udata parameter is not an event we registered for, so we should not be "missing" any events. In theory.
                         //
                         id pe = ev.udata;
-                        if (pe && [pe respondsToSelector:@selector(path)])
+                        if (pe && [(VDKQueuePathEntry *)pe respondsToSelector:@selector(path)])
                         {
                             NSString *fpath = [((VDKQueuePathEntry *)pe).path retain];         // Need to retain so it does not disappear while the block at the bottom is waiting to run on the main thread. Released in that block.
                             if (!fpath) continue;

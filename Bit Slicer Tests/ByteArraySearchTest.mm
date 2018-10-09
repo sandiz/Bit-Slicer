@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 5/24/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,11 +34,12 @@
 
 @interface ByteArraySearchTest : XCTestCase
 
-@property (nonatomic) NSData *data;
-
 @end
 
 @implementation ByteArraySearchTest
+{
+	NSData *_data;
+}
 
 extern "C" unsigned char* boyer_moore_helper(const unsigned char *haystack, const unsigned char *needle, unsigned long haystack_length, unsigned long needle_length, const unsigned long *char_jump, const unsigned long *match_jump);
 
@@ -50,20 +49,24 @@ extern void ZGPrepareBoyerMooreSearch(const unsigned char *needle, const unsigne
 {
 	[super setUp];
 	
-	NSData *data = [NSData dataWithContentsOfFile:[[NSBundle bundleForClass:[self class]] pathForResource:@"random_data" ofType:@""]];
+	NSBundle *bundle = [NSBundle bundleForClass:[self class]];
+	NSString *randomDataPath = [bundle pathForResource:@"random_data" ofType:@""];
+	XCTAssertNotNil(randomDataPath);
+	
+	NSData *data = [NSData dataWithContentsOfFile:randomDataPath];
 	XCTAssertNotNil(data);
 	
-	self.data = data;
+	_data = data;
 }
 
 - (BOOL)searchAndVerifyBytes:(const uint8_t *)bytes length:(NSUInteger)length getNumberOfResults:(NSUInteger *)numberOfResultsBack
 {
-	XCTAssertTrue(length <= self.data.length);
+	XCTAssertTrue(length <= _data.length);
 	
 	NSUInteger numberOfResults = 0;
-	for (NSUInteger dataIndex = 0; dataIndex + length <= self.data.length; dataIndex++)
+	for (NSUInteger dataIndex = 0; dataIndex + length <= _data.length; dataIndex++)
 	{
-		if (memcmp(bytes, static_cast<const uint8_t *>(self.data.bytes) + dataIndex, length) == 0)
+		if (memcmp(bytes, static_cast<const uint8_t *>(_data.bytes) + dataIndex, length) == 0)
 		{
 			numberOfResults++;
 		}
@@ -71,9 +74,9 @@ extern void ZGPrepareBoyerMooreSearch(const unsigned char *needle, const unsigne
 	
 	NSUInteger numberOfBoyerMooreResults = 0;
 	
-	unsigned long long size = self.data.length;
+	unsigned long long size = _data.length;
 	unsigned long long dataSize = length;
-	const unsigned char *dataBytes = static_cast<const unsigned char *>(self.data.bytes);
+	const unsigned char *dataBytes = static_cast<const unsigned char *>(_data.bytes);
 	
 	unsigned long charJump[UCHAR_MAX + 1] = {0};
 	unsigned long *matchJump = static_cast<unsigned long *>(malloc(2 * (dataSize + 1) * sizeof(*matchJump)));
@@ -86,7 +89,7 @@ extern void ZGPrepareBoyerMooreSearch(const unsigned char *needle, const unsigne
 	while (haystackLengthLeft >= dataSize)
 	{
 		foundSubstring = boyer_moore_helper(foundSubstring, bytes, haystackLengthLeft, dataSize, charJump, matchJump);
-		if (foundSubstring == NULL) break;
+		if (foundSubstring == nullptr) break;
 		
 		// boyer_moore_helper is only checking 0 .. dataSize-1 characters, so make a check to see if the last characters are equal
 		if (foundSubstring[dataSize-1] == bytes[dataSize-1])

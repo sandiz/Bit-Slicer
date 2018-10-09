@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 4/6/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,19 +34,18 @@
 #import "ZGSearchProgress.h"
 #import "ZGProcess.h"
 #import "ZGMemoryDumpFunctions.h"
-#import "ZGUtilities.h"
-
-@interface ZGMemoryDumpAllWindowController ()
-
-@property (nonatomic, assign) IBOutlet NSButton *cancelButton;
-@property (nonatomic, assign) IBOutlet NSProgressIndicator *progressIndicator;
-
-@property (nonatomic) ZGSearchProgress *searchProgress;
-@property (nonatomic) BOOL isBusy;
-
-@end
+#import "ZGRunAlertPanel.h"
+#import "ZGDeliverUserNotifications.h"
+#import "ZGNullability.h"
 
 @implementation ZGMemoryDumpAllWindowController
+{
+	IBOutlet NSButton *_cancelButton;
+	IBOutlet NSProgressIndicator *_progressIndicator;
+	
+	ZGSearchProgress * _Nullable _searchProgress;
+	BOOL _isBusy;
+}
 
 - (NSString *)windowNibName
 {
@@ -58,95 +55,99 @@
 - (void)attachToWindow:(NSWindow *)parentWindow withProcess:(ZGProcess *)process
 {
 	NSSavePanel *savePanel = NSSavePanel.savePanel;
+	savePanel.nameFieldStringValue = process.name;
 	savePanel.message = ZGLocalizedStringFromDumpAllMemoryTable(@"savePanelPromptMessage");
 	
-	[savePanel
-	 beginSheetModalForWindow:parentWindow
-	 completionHandler:^(NSInteger result)
-	 {
-		 if (result == NSFileHandlingPanelOKButton)
-		 {
-			 dispatch_async(dispatch_get_main_queue(), ^{
-				 NSFileManager *fileManager = [[NSFileManager alloc] init];
-				 
-				 if ([fileManager fileExistsAtPath:savePanel.URL.relativePath])
-				 {
-					 [fileManager
-					  removeItemAtPath:savePanel.URL.relativePath
-					  error:NULL];
-				 }
-				 
-				 [fileManager
-				  createDirectoryAtPath:savePanel.URL.relativePath
-				  withIntermediateDirectories:NO
-				  attributes:nil
-				  error:NULL];
-				 
-				 [NSApp
-				  beginSheet:self.window
-				  modalForWindow:parentWindow
-				  modalDelegate:self
-				  didEndSelector:nil
-				  contextInfo:NULL];
-				 
-				 [self.cancelButton setEnabled:YES];
-				 
-				 self.isBusy = YES;
-				 
-				 id dumpMemoryActivity = nil;
-				 if ([[NSProcessInfo processInfo] respondsToSelector:@selector(beginActivityWithOptions:reason:)])
-				 {
-					 dumpMemoryActivity = [[NSProcessInfo processInfo] beginActivityWithOptions:NSActivityUserInitiated reason:@"Dumping All Memory"];
-				 }
-				 
-				 dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-					 if (!ZGDumpAllDataToDirectory(savePanel.URL.relativePath, process.processTask, self))
-					 {
-						 ZGRunAlertPanelWithOKButton(
-										 ZGLocalizedStringFromDumpAllMemoryTable(@"failedMemoryDumpAlertTitle"),
-										 ZGLocalizedStringFromDumpAllMemoryTable(@"failedMemoryDumpAlertMessage"));
-					 }
-					 
-					 dispatch_async(dispatch_get_main_queue(), ^{
-						 if (!self.searchProgress.shouldCancelSearch)
-						 {
-							 ZGDeliverUserNotification(ZGLocalizedStringFromDumpAllMemoryTable(@"finishedDumpingMemoryNotificationTitle"), nil, [NSString stringWithFormat:ZGLocalizedStringFromDumpAllMemoryTable(@"finishedDumpingMemoryNotificationMessageFormat"), process.name]);
-						 }
-						 
-						 self.progressIndicator.doubleValue = 0.0;
-						 
-						 [NSApp endSheet:self.window];
-						 [self.window close];
-						 
-						 self.isBusy = NO;
-						 self.searchProgress = nil;
-						 
-						 if (dumpMemoryActivity != nil)
-						 {
-							 [[NSProcessInfo processInfo] endActivity:dumpMemoryActivity];
-						 }
-					 });
-				 });
-			 });
-		 }
-	 }];
+	[savePanel beginSheetModalForWindow:parentWindow completionHandler:^(NSInteger result) {
+		if (result != NSFileHandlingPanelOKButton)
+		{
+			return;
+		}
+
+		NSFileManager *fileManager = [[NSFileManager alloc] init];
+
+		NSURL *saveURL = ZGUnwrapNullableObject(savePanel.URL);
+		NSString *saveURLPath = ZGUnwrapNullableObject(saveURL.path);
+		 
+		if ([fileManager fileExistsAtPath:saveURLPath])
+		{
+			NSError *removeItemError = nil;
+			if (![fileManager removeItemAtURL:saveURL error:&removeItemError])
+			{
+				NSLog(@"Failed to remove %@ with error %@", saveURLPath, removeItemError);
+				return;
+			}
+		}
+
+		NSError *createDirectoryError = nil;
+		if (![fileManager createDirectoryAtURL:saveURL withIntermediateDirectories:NO attributes:nil error:&createDirectoryError])
+		{
+			NSLog(@"Failed to create directory at %@ with error %@", saveURLPath, createDirectoryError);
+			return;
+		}
+		
+		// Dispatch our task later so that the sheet shows up *after* our save panel is dismissed
+		dispatch_async(dispatch_get_main_queue(), ^{
+			NSWindow *window = ZGUnwrapNullableObject(self.window);
+			
+			[parentWindow beginSheet:window completionHandler:^(NSModalResponse __unused returnCode) {
+			}];
+			 
+			[self->_cancelButton setEnabled:YES];
+
+			self->_isBusy = YES;
+			 
+			id dumpMemoryActivity = [[NSProcessInfo processInfo] beginActivityWithOptions:NSActivityUserInitiated reason:@"Dumping All Memory"];
+			
+			dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+				BOOL dumpedAllData = ZGDumpAllDataToDirectory(saveURLPath, process, self);
+				
+				dispatch_async(dispatch_get_main_queue(), ^{
+					if (!self->_searchProgress.shouldCancelSearch)
+					{
+						if (dumpedAllData)
+						{
+							ZGDeliverUserNotification(ZGLocalizedStringFromDumpAllMemoryTable(@"finishedDumpingMemoryNotificationTitle"), nil, [NSString stringWithFormat:ZGLocalizedStringFromDumpAllMemoryTable(@"finishedDumpingMemoryNotificationMessageFormat"), process.name], nil);
+						}
+						else
+						{
+							ZGRunAlertPanelWithOKButton(ZGLocalizedStringFromDumpAllMemoryTable(@"failedMemoryDumpAlertTitle"), ZGLocalizedStringFromDumpAllMemoryTable(@"failedMemoryDumpAlertMessage"));
+						}
+					}
+
+					self->_progressIndicator.doubleValue = 0.0;
+
+					[NSApp endSheet:window];
+					[window close];
+
+					self->_isBusy = NO;
+					self->_searchProgress = nil;
+
+					if (dumpMemoryActivity != nil)
+					{
+						[[NSProcessInfo processInfo] endActivity:dumpMemoryActivity];
+					}
+				});
+			});
+		});
+	}];
 }
 
 - (IBAction)cancelDumpingAllMemory:(id)__unused sender
 {
-	self.searchProgress.shouldCancelSearch = YES;
-	[self.cancelButton setEnabled:NO];
+	_searchProgress.shouldCancelSearch = YES;
+	[_cancelButton setEnabled:NO];
 }
 
 - (void)progressWillBegin:(ZGSearchProgress *)searchProgress
 {
-	self.searchProgress = searchProgress;
-	self.progressIndicator.maxValue = self.searchProgress.maxProgress;
+	_searchProgress = searchProgress;
+	_progressIndicator.maxValue = _searchProgress.maxProgress;
 }
 
 - (void)progress:(ZGSearchProgress *)searchProgress advancedWithResultSet:(NSData *)__unused resultSet
 {
-	self.progressIndicator.doubleValue = searchProgress.progress;
+	_progressIndicator.doubleValue = searchProgress.progress;
 }
 
 @end

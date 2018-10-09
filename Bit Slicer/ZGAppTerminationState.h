@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 3/10/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,7 +30,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import <Foundation/Foundation.h>
+#import <Cocoa/Cocoa.h>
+
+NS_ASSUME_NONNULL_BEGIN
 
 @interface ZGAppTerminationState : NSObject
 
@@ -42,3 +42,5 @@
 - (void)decreaseLifeCount;
 
 @end
+
+NS_ASSUME_NONNULL_END

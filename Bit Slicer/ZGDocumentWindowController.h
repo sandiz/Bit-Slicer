@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 8/9/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,11 +37,10 @@
 
 #define ZGLocalizableSearchDocumentString(string) NSLocalizedStringFromTable(string, @"[Code] Search Document", nil)
 
-#define ZGTargetProcessDiedNotification @"ZGTargetProcessDiedNotification"
-
 @class ZGDocumentTableController;
 @class ZGVariableController;
 @class ZGDocumentSearchController;
+@class ZGVariable;
 @class ZGProcess;
 @class ZGSearchResults;
 @class ZGRunningProcess;
@@ -51,51 +48,57 @@
 @class ZGSearchData;
 @class ZGScriptManager;
 @class ZGTableView;
+@class ZGDebuggerController;
 @class ZGBreakPointController;
+@class ZGScriptingInterpreter;
 @class ZGLoggerWindowController;
 @class ZGHotKeyCenter;
 @class ZGDocument;
+@class ZGAppTerminationState;
 
-@interface ZGDocumentWindowController : ZGMemoryWindowController <AGScopeBarDelegate>
+NS_ASSUME_NONNULL_BEGIN
+
+@interface ZGDocumentWindowController : ZGMemoryWindowController <AGScopeBarDelegate, NSAlertDelegate>
 
 @property (readonly, nonatomic) ZGBreakPointController *breakPointController;
+@property (readonly, nonatomic) ZGScriptingInterpreter *scriptingInterpreter;
 @property (readonly, nonatomic) ZGLoggerWindowController *loggerWindowController;
 @property (readonly, nonatomic) ZGHotKeyCenter *hotKeyCenter;
 
-@property (nonatomic, assign) IBOutlet ZGTableView *variablesTableView;
-@property (nonatomic, assign) IBOutlet NSProgressIndicator *progressIndicator;
-@property (nonatomic, assign) IBOutlet NSPopUpButton *dataTypesPopUpButton;
-@property (nonatomic, assign) IBOutlet NSButton *storeValuesButton;
-@property (nonatomic, assign) IBOutlet NSSearchField *searchValueTextField;
-@property (nonatomic, assign) IBOutlet NSPopUpButton *functionPopUpButton;
+@property (nonatomic) IBOutlet ZGTableView *variablesTableView;
+@property (nonatomic) IBOutlet NSProgressIndicator *progressIndicator;
+@property (nonatomic) IBOutlet NSPopUpButton *dataTypesPopUpButton;
+@property (nonatomic) IBOutlet NSButton *storeValuesButton;
+@property (nonatomic) IBOutlet NSSearchField *searchValueTextField;
+@property (nonatomic) IBOutlet NSPopUpButton *functionPopUpButton;
 
-@property (nonatomic) ZGDocumentTableController *tableController;
-@property (nonatomic) ZGVariableController *variableController;
-@property (nonatomic) ZGDocumentSearchController *searchController;
-@property (nonatomic) ZGScriptManager *scriptManager;
+@property (nonatomic, readonly) ZGDocumentTableController *tableController;
+@property (nonatomic, readonly) ZGVariableController *variableController;
+@property (nonatomic, readonly) ZGDocumentSearchController *searchController;
+@property (nonatomic, readonly) ZGScriptManager *scriptManager;
 
-@property (nonatomic) ZGProcess *currentProcess;
-
-@property (assign, nonatomic) ZGDocumentData *documentData;
-@property (assign, nonatomic) ZGSearchData *searchData;
+@property (nonatomic, readonly) ZGDocumentData *documentData;
+@property (nonatomic, readonly) ZGSearchData *searchData;
 
 @property (nonatomic, readonly) NSString *flagsStringValue;
 @property (nonatomic, readonly) BOOL showsFlags;
 
-- (id)initWithDocument:(ZGDocument *)document;
+- (id)initWithProcessTaskManager:(ZGProcessTaskManager *)processTaskManager rootlessConfiguration:(nullable ZGRootlessConfiguration *)rootlessConfiguration debuggerController:(ZGDebuggerController *)debuggerController breakPointController:(ZGBreakPointController *)breakPointController scriptingInterpreter:(ZGScriptingInterpreter *)scriptingInterpreter hotKeyCenter:(ZGHotKeyCenter *)hotKeyCenter loggerWindowController:(ZGLoggerWindowController *)loggerWindowController lastChosenInternalProcessName:(nullable NSString *)lastChosenInternalProcessName preferringNewTab:(BOOL)preferringNewTab delegate:(nullable id <ZGChosenProcessDelegate, ZGMemorySelectionDelegate, ZGShowMemoryWindow>)delegate;
 
 - (void)loadDocumentUserInterface;
+
+- (void)cleanupWithAppTerminationState:(ZGAppTerminationState *)appTerminationState;
 
 - (void)markDocumentChange;
 
 - (void)updateNumberOfValuesDisplayedStatus;
 - (void)setStatusString:(NSString *)statusString;
 
-- (IBAction)requestEditingVariableDescription:(id)sender;
-- (IBAction)requestEditingVariableAddress:(id)sender;
+- (IBAction)requestEditingVariableDescription:(nullable id)sender;
+- (IBAction)requestEditingVariableAddress:(nullable id)sender;
 
 - (NSIndexSet *)selectedVariableIndexes;
-- (NSArray *)selectedVariables;
+- (NSArray<ZGVariable *> *)selectedVariables;
 
 - (void)updateOptions;
 
@@ -105,6 +108,8 @@
 - (void)deselectSearchField;
 - (void)insertStoredValueToken;
 
-- (void)updateVariables:(NSArray *)newWatchVariablesArray searchResults:(ZGSearchResults *)searchResults;
+- (void)updateVariables:(NSArray<ZGVariable *> *)newWatchVariablesArray searchResults:(nullable ZGSearchResults *)searchResults;
 
 @end
+
+NS_ASSUME_NONNULL_END

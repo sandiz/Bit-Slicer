@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 8/26/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,23 +31,25 @@
  */
 
 #import <Foundation/Foundation.h>
-#import "Python.h"
+#import "Python/Python.h"
 #import "ZGMemoryTypes.h"
 #import "ZGSearchProgressDelegate.h"
 
 @class ZGProcess;
 @class ZGSearchProgress;
 
-extern PyObject *gVirtualMemoryException;
+NS_ASSUME_NONNULL_BEGIN
 
 @interface ZGPyVirtualMemory : NSObject <ZGSearchProgressDelegate>
 
-+ (void)loadPythonClassInMainModule:(PyObject *)module;
++ (nullable PyObject *)loadPythonClassInMainModule:(PyObject *)module;
 
-- (id)initWithProcess:(ZGProcess *)process;
-- (id)initWithProcessNoCopy:(ZGProcess *)process;
+- (nullable id)initWithProcess:(ZGProcess *)process virtualMemoryException:(PyObject *)virtualMemoryException;
+- (nullable id)initWithProcessNoCopy:(ZGProcess *)process virtualMemoryException:(PyObject *)virtualMemoryException;
 
-@property (nonatomic, readonly, assign) PyObject *object;
-@property (atomic, readonly) ZGSearchProgress *searchProgress; // main queue property
+@property (nonatomic, readonly, nullable) PyObject *object;
+@property (nonatomic, readonly, nullable) ZGSearchProgress *searchProgress; // main queue property
 
 @end
+
+NS_ASSUME_NONNULL_END

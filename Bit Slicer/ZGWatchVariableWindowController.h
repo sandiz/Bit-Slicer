@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 12/25/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,17 +33,26 @@
 #import <Cocoa/Cocoa.h>
 #import "ZGBreakPointController.h"
 #import "ZGBreakPointDelegate.h"
+#import "ZGShowMemoryWindow.h"
 
 @class ZGVariable;
 @class ZGProcess;
 @class ZGBreakPointController;
 
+NS_ASSUME_NONNULL_BEGIN
+
+typedef void (^watch_variable_completion_t)(NSArray<ZGVariable *> *variablesFound);
+
 @interface ZGWatchVariableWindowController : NSWindowController <ZGBreakPointDelegate, NSTableViewDataSource>
 
-- (id)initWithBreakPointController:(ZGBreakPointController *)breakPointController;
-
-typedef void (^watch_variable_completion_t)(NSArray *variablesFound);
+- (id)initWithBreakPointController:(ZGBreakPointController *)breakPointController delegate:(nullable id <ZGShowMemoryWindow>)delegate;
 
 - (void)watchVariable:(ZGVariable *)variable withWatchPointType:(ZGWatchPointType)watchPointType inProcess:(ZGProcess *)process attachedToWindow:(NSWindow *)parentWindow completionHandler:(watch_variable_completion_t)completionHandler;
 
+- (void)triggerCurrentProcessChanged;
+
+- (void)cleanup;
+
 @end
+
+NS_ASSUME_NONNULL_END

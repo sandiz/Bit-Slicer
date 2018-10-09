@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 8/24/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,6 +36,8 @@
 @class ZGBreakPoint;
 @class ZGRegistersState;
 
+NS_ASSUME_NONNULL_BEGIN
+
 @protocol ZGBreakPointDelegate <NSObject>
 
 @optional
@@ -49,3 +49,5 @@
 - (void)conditionalInstructionBreakPointWasRemoved;
 
 @end
+
+NS_ASSUME_NONNULL_END

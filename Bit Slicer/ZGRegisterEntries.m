@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 2/22/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,6 +32,7 @@
 
 #import "ZGRegisterEntries.h"
 #import "ZGVariable.h"
+#import "ZGNullability.h"
 
 @implementation ZGRegisterEntries
 
@@ -226,9 +225,9 @@ void *ZGRegisterEntryValue(ZGRegisterEntry *entry)
 	return entryIndex;
 }
 
-+ (NSArray *)registerVariablesFromVectorThreadState:(zg_x86_vector_state_t)vectorState is64Bit:(BOOL)is64Bit hasAVXSupport:(BOOL)hasAVXSupport
++ (NSArray<ZGVariable *> *)registerVariablesFromVectorThreadState:(zg_x86_vector_state_t)vectorState is64Bit:(BOOL)is64Bit hasAVXSupport:(BOOL)hasAVXSupport
 {
-	NSMutableArray *registerVariables = [[NSMutableArray alloc] init];
+	NSMutableArray<ZGVariable *> *registerVariables = [[NSMutableArray alloc] init];
 	
 	ZGRegisterEntry entries[64];
 	[ZGRegisterEntries getRegisterEntries:entries fromVectorThreadState:vectorState is64Bit:is64Bit hasAVXSupport:hasAVXSupport];
@@ -243,7 +242,7 @@ void *ZGRegisterEntryValue(ZGRegisterEntry *entry)
 		 type:ZGByteArray
 		 qualifier:0
 		 pointerSize:is64Bit ? sizeof(int64_t) : sizeof(int32_t)
-		 description:[[NSAttributedString alloc] initWithString:@(entry->name)]];
+		 description:[[NSAttributedString alloc] initWithString:ZGUnwrapNullableObject(@(entry->name))]];
 		
 		[registerVariables addObject:variable];
 	}
@@ -251,9 +250,9 @@ void *ZGRegisterEntryValue(ZGRegisterEntry *entry)
 	return registerVariables;
 }
 
-+ (NSArray *)registerVariablesFromGeneralPurposeThreadState:(x86_thread_state_t)threadState is64Bit:(BOOL)is64Bit
++ (NSArray<ZGVariable *> *)registerVariablesFromGeneralPurposeThreadState:(x86_thread_state_t)threadState is64Bit:(BOOL)is64Bit
 {
-	NSMutableArray *registerVariables = [[NSMutableArray alloc] init];
+	NSMutableArray<ZGVariable *> *registerVariables = [[NSMutableArray alloc] init];
 	
 	ZGRegisterEntry entries[28];
 	[ZGRegisterEntries getRegisterEntries:entries fromGeneralPurposeThreadState:threadState is64Bit:is64Bit];
@@ -268,7 +267,7 @@ void *ZGRegisterEntryValue(ZGRegisterEntry *entry)
 		 type:ZGByteArray
 		 qualifier:0
 		 pointerSize:is64Bit ? sizeof(int64_t) : sizeof(int32_t)
-		 description:[[NSAttributedString alloc] initWithString:@(entry->name)]];
+		 description:[[NSAttributedString alloc] initWithString:ZGUnwrapNullableObject(@(entry->name))]];
 		
 		[registerVariables addObject:variable];
 	}

@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 3/10/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,6 +31,7 @@
  */
 
 #import "ZGAppPathUtilities.h"
+#import "ZGNullability.h"
 
 @implementation ZGAppPathUtilities
 
@@ -74,7 +73,7 @@
 		return nil;
 	}
 	
-	NSString *emptyPythonFilePath = [applicationSupportPath stringByAppendingPathComponent:[@"temporary_script" stringByAppendingPathExtension:@"py"]];
+	NSString *emptyPythonFilePath = [applicationSupportPath stringByAppendingPathComponent:ZGUnwrapNullableObject([@"temporary_script" stringByAppendingPathExtension:@"py"])];
 	
 	if ([fileManager fileExistsAtPath:emptyPythonFilePath])
 	{

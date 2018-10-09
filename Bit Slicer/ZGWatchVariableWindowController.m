@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 12/25/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -44,63 +42,60 @@
 #import "ZGProcess.h"
 #import "ZGCalculator.h"
 #import "ZGVirtualMemory.h"
-#import "ZGVirtualMemoryHelpers.h"
 #import "NSArrayAdditions.h"
 #import "ZGVariableController.h"
-#import "ZGUtilities.h"
+#import "ZGDeliverUserNotifications.h"
+#import "ZGRunAlertPanel.h"
+#import "ZGLocalization.h"
 #import "ZGRegisterEntries.h"
 #import "ZGMachBinary.h"
-#import "ZGNavigationPost.h"
 #import "ZGTableView.h"
+#import "ZGNullability.h"
+#import "ZGDebugLogging.h"
 
 #define ZGLocalizableWatchVariableString(string) NSLocalizedStringFromTable(string, @"[Code] Watch Variable", nil)
 
-@interface ZGWatchVariableWindowController ()
-
-@property (nonatomic) ZGBreakPointController *breakPointController;
-
-@property (nonatomic, assign) IBOutlet NSProgressIndicator *progressIndicator;
-@property (nonatomic, assign) IBOutlet NSTextField *statusTextField;
-@property (nonatomic, assign) IBOutlet NSButton *addButton;
-@property (nonatomic, assign) IBOutlet ZGTableView *tableView;
-
-@property (nonatomic) ZGProcess *watchProcess;
-@property (nonatomic) id watchActivity;
-@property (nonatomic) NSMutableArray *foundWatchVariables;
-@property (nonatomic) NSMutableDictionary *foundWatchVariablesDictionary;
-@property (nonatomic, copy) watch_variable_completion_t completionHandler;
-
-@end
-
 @implementation ZGWatchVariableWindowController
+{
+	IBOutlet NSProgressIndicator *_progressIndicator;
+	IBOutlet NSTextField *_statusTextField;
+	IBOutlet NSButton *_addButton;
+	IBOutlet ZGTableView *_tableView;
+	IBOutlet NSTableColumn *_addTableColumn;
+	
+	ZGBreakPointController * _Nonnull _breakPointController;
+	ZGProcess * _Nullable _watchProcess;
+	id _Nullable _watchActivity;
+	NSMutableArray<ZGWatchVariable *> * _Nullable _foundWatchVariables;
+	NSMutableDictionary<NSNumber *, ZGWatchVariable *> * _Nullable _foundWatchVariablesDictionary;
+	watch_variable_completion_t _Nullable _completionHandler;
+	
+	__weak id <ZGShowMemoryWindow> _Nullable _delegate;
+}
 
 #pragma mark Birth & Death
 
-- (id)initWithBreakPointController:(ZGBreakPointController *)breakPointController
+- (id)initWithBreakPointController:(ZGBreakPointController *)breakPointController delegate:(id <ZGShowMemoryWindow>)delegate
 {
 	self = [super init];
 	if (self != nil)
 	{
-		[[NSNotificationCenter defaultCenter]
-		 addObserver:self
-		 selector:@selector(applicationWillTerminate:)
-		 name:NSApplicationWillTerminateNotification
-		 object:nil];
-		
-		self.breakPointController = breakPointController;
+		_breakPointController = breakPointController;
+		_delegate = delegate;
 	}
 	return self;
 }
 
-- (void)dealloc
+- (void)windowDidLoad
 {
-	[[NSNotificationCenter defaultCenter] removeObserver:self];
-	self.watchProcess = nil;
+	ZGAdjustLocalizableWidthsForWindowAndTableColumns(ZGUnwrapNullableObject(self.window), @[_addTableColumn], @{@"ru" : @[@20.0]});
 }
 
-- (void)applicationWillTerminate:(NSNotification *)__unused notification
+// This method may not realistically be called due to the watch window sheet preventing normal app termination..
+// But just in case..
+- (void)cleanup
 {
-	[self.breakPointController removeObserver:self];
+	[_breakPointController removeObserver:self];
 }
 
 - (NSString *)windowNibName
@@ -112,41 +107,45 @@
 
 - (void)stopWatchingAndInvokeCompletionHandler:(BOOL)shouldInvokeCompletionHandler
 {
-	[self.breakPointController removeObserver:self];
-	self.watchProcess = nil;
+	[_breakPointController removeObserver:self];
+	_watchProcess = nil;
 	
-	[self.progressIndicator stopAnimation:nil];
+	[_progressIndicator stopAnimation:nil];
 	
-	[NSApp endSheet:self.window];
-	[self.window close];
+	NSWindow *window = ZGUnwrapNullableObject([self window]);
+	[NSApp endSheet:window];
+	[window close];
 	
-	if (self.watchActivity != nil)
+	if (_watchActivity != nil)
 	{
-		[[NSProcessInfo processInfo] endActivity:self.watchActivity];
-		self.watchActivity = nil;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wpartial-availability"
+		[[NSProcessInfo processInfo] endActivity:(id _Nonnull)_watchActivity];
+#pragma clang diagnostic pop
+		_watchActivity = nil;
 	}
 	
 	if (shouldInvokeCompletionHandler)
 	{
-		NSArray *desiredWatchVariables = [self.foundWatchVariables zgFilterUsingBlock:^(ZGWatchVariable *watchVariable) { return watchVariable.instruction.variable.enabled; }];
+		NSArray<ZGWatchVariable *> *desiredWatchVariables = [_foundWatchVariables zgFilterUsingBlock:^(ZGWatchVariable *watchVariable) { return watchVariable.instruction.variable.enabled; }];
 		
 		for (ZGWatchVariable *watchVariable in desiredWatchVariables)
 		{
 			[self annotateWatchVariableDescription:watchVariable];
 		}
 		
-		NSArray *desiredVariables = [desiredWatchVariables zgMapUsingBlock:^id(ZGWatchVariable *watchVariable) { return watchVariable.instruction.variable; }];
+		NSArray<ZGVariable *> *desiredVariables = [desiredWatchVariables zgMapUsingBlock:^id(ZGWatchVariable *watchVariable) { return watchVariable.instruction.variable; }];
 		
 		for (ZGVariable *variable in desiredVariables)
 		{
 			variable.enabled = NO;
 		}
-		self.completionHandler(desiredVariables);
+		_completionHandler(desiredVariables);
 	}
 	
-	self.completionHandler = nil;
-	self.foundWatchVariables = nil;
-	self.foundWatchVariablesDictionary = nil;
+	_completionHandler = nil;
+	_foundWatchVariables = nil;
+	_foundWatchVariablesDictionary = nil;
 }
 
 - (IBAction)stopWatchingAndAddInstructions:(id)__unused sender
@@ -159,18 +158,15 @@
 	[self stopWatchingAndInvokeCompletionHandler:NO];
 }
 
-- (void)watchProcessDied:(NSNotification *)__unused notification
+- (void)triggerCurrentProcessChanged
 {
-	if (self.foundWatchVariables.count == 0)
+	if (_foundWatchVariables.count == 0)
 	{
 		[self cancel:nil];
 	}
 	else
 	{
-		NSInteger result = ZGRunAlertPanelWithDefaultAndCancelButton(
-						[NSString stringWithFormat:ZGLocalizableWatchVariableString(@"targetTeriminatedAlertTitleFormat"), self.watchProcess.name],
-						ZGLocalizableWatchVariableString(@"targetTeriminatedAlertMessage"),
-						ZGLocalizableWatchVariableString(@"targetTeriminatedAlertAddButton"));
+		NSInteger result = ZGRunAlertPanelWithDefaultAndCancelButton([NSString stringWithFormat:ZGLocalizableWatchVariableString(@"targetTeriminatedAlertTitleFormat"), _watchProcess.name], ZGLocalizableWatchVariableString(@"targetTeriminatedAlertMessage"), ZGLocalizableWatchVariableString(@"targetTeriminatedAlertAddButton"));
 		switch (result)
 		{
 			case NSAlertFirstButtonReturn:
@@ -185,43 +181,21 @@
 
 #pragma mark Misc.
 
-- (void)setWatchProcess:(ZGProcess *)watchProcess
-{
-	if (_watchProcess != nil)
-	{
-		[[NSNotificationCenter defaultCenter]
-		 removeObserver:self
-		 name:ZGTargetProcessDiedNotification
-		 object:watchProcess];
-	}
-	
-	_watchProcess = watchProcess;
-	
-	if (_watchProcess != nil)
-	{
-		[[NSNotificationCenter defaultCenter]
-		 addObserver:self
-		 selector:@selector(watchProcessDied:)
-		 name:ZGTargetProcessDiedNotification
-		 object:watchProcess];
-	}
-}
-
 - (void)updateAddButton
 {
-	NSUInteger variableCount = [[self.foundWatchVariables zgFilterUsingBlock:^(ZGWatchVariable *watchVariable) { return watchVariable.instruction.variable.enabled; }] count];
-	[self.addButton setEnabled:variableCount > 0];
+	NSUInteger variableCount = [[_foundWatchVariables zgFilterUsingBlock:^(ZGWatchVariable *watchVariable) { return watchVariable.instruction.variable.enabled; }] count];
+	[_addButton setEnabled:variableCount > 0];
 }
 
 #pragma mark Watching
 
 - (void)appendDescription:(NSMutableAttributedString *)description withRegisterEntries:(ZGRegisterEntry *)registerEntries registerLabel:(NSString *)registerLabel boldFont:(NSFont *)boldFont
 {
-	[description appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n\n"]];
-	[description appendAttributedString:[[NSAttributedString alloc] initWithString:registerLabel attributes:@{NSFontAttributeName : boldFont}]];
-	[description appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"]];
+	[description appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n\n" attributes:@{NSForegroundColorAttributeName : [NSColor textColor]}]];
+	[description appendAttributedString:[[NSAttributedString alloc] initWithString:registerLabel attributes:@{NSForegroundColorAttributeName : [NSColor textColor], NSFontAttributeName : boldFont}]];
+	[description appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n" attributes:@{NSForegroundColorAttributeName : [NSColor textColor]}]];
 	
-	NSMutableArray *registerLines = [NSMutableArray array];
+	NSMutableArray<NSString *> *registerLines = [NSMutableArray array];
 	
 	for (ZGRegisterEntry *registerEntry = registerEntries; !ZG_REGISTER_ENTRY_IS_NULL(registerEntry); registerEntry++)
 	{
@@ -247,32 +221,34 @@
 		[registerLines addObject:registerLine];
 	}
 	
-	[description appendAttributedString:[[NSAttributedString alloc] initWithString:[registerLines componentsJoinedByString:@"\n"]]];
+	[description appendAttributedString:[[NSAttributedString alloc] initWithString:[registerLines componentsJoinedByString:@"\n"] attributes:@{NSForegroundColorAttributeName : [NSColor textColor]}]];
 }
 
 - (void)annotateWatchVariableDescription:(ZGWatchVariable *)watchVariable
 {
 	NSFont *userFont = [NSFont userFontOfSize:12];
-	NSFont *boldFont = [[NSFontManager sharedFontManager] fontWithFamily:userFont.familyName traits:NSBoldFontMask weight:0 size:userFont.pointSize];
+	NSString *userFontFamilyName = userFont.familyName;
+	
+	if (userFontFamilyName == nil)
+	{
+		ZG_LOG(@"Failed to retrieve user font family name from %@", userFont);
+		return;
+	}
+	
+	NSFont *boldFont = [[NSFontManager sharedFontManager] fontWithFamily:userFontFamilyName traits:NSBoldFontMask weight:0 size:userFont.pointSize];
+	
+	if (boldFont == nil)
+	{
+		ZG_LOG(@"Failed to retrieve bold font from family name %@", userFontFamilyName);
+		return;
+	}
 	
 	ZGInstruction *instruction = watchVariable.instruction;
 	ZGRegistersState *registersState = watchVariable.registersState;
 	
-	NSString *accessedTimes = @"";
-	if (floor(NSAppKitVersionNumber) > NSAppKitVersionNumber10_8)
-	{
-		accessedTimes = [NSString stringWithFormat:ZGLocalizableWatchVariableString(@"accessedTimesFormat"), watchVariable.accessCount];
-	}
-	else if (watchVariable.accessCount == 1)
-	{
-		accessedTimes = [NSString stringWithFormat:ZGLocalizableWatchVariableString(@"accessedSingleTimeFormat"), watchVariable.accessCount];
-	}
-	else
-	{
-		accessedTimes = [NSString stringWithFormat:ZGLocalizableWatchVariableString(@"accessedMultipleTimesFormat"), watchVariable.accessCount];
-	}
+	NSString *accessedTimes = [NSString stringWithFormat:ZGLocalizableWatchVariableString(@"accessedTimesFormat"), watchVariable.accessCount];
 	
-	NSMutableAttributedString *description = [[NSMutableAttributedString alloc] initWithString:[NSString stringWithFormat:@"%@\n%@", instruction.text, accessedTimes]];
+	NSMutableAttributedString *description = [[NSMutableAttributedString alloc] initWithString:[NSString stringWithFormat:@"%@\n%@", instruction.text, accessedTimes] attributes:@{NSForegroundColorAttributeName : [NSColor textColor]}];
 	
 	ZGRegisterEntry registerEntries[ZG_MAX_REGISTER_ENTRIES];
 	int numberOfGeneralRegisters = [ZGRegisterEntries getRegisterEntries:registerEntries fromGeneralPurposeThreadState:registersState.generalPurposeThreadState is64Bit:registersState.is64Bit];
@@ -305,23 +281,24 @@
 
 - (void)dataAccessedByBreakPoint:(ZGBreakPoint *)__unused breakPoint fromInstructionPointer:(ZGMemoryAddress)instructionAddress withRegistersState:(ZGRegistersState *)registersState
 {
-	if (!self.watchProcess.valid)
+	ZGProcess *watchProcess = _watchProcess;
+	if (!watchProcess.valid)
 	{
 		return;
 	}
 	
 	NSNumber *instructionAddressNumber = @(instructionAddress);
 	
-	ZGWatchVariable *existingWatchVariable = [self.foundWatchVariablesDictionary objectForKey:instructionAddressNumber];
+	ZGWatchVariable *existingWatchVariable = _foundWatchVariablesDictionary[instructionAddressNumber];
 	if (existingWatchVariable != nil)
 	{
 		[existingWatchVariable increaseAccessCount];
-		[self.tableView reloadData];
+		[_tableView reloadData];
 		return;
 	}
 	
-	NSArray *machBinaries = [ZGMachBinary machBinariesInProcess:self.watchProcess];
-	ZGInstruction *instruction = [ZGDebuggerUtilities findInstructionBeforeAddress:instructionAddress inProcess:self.watchProcess withBreakPoints:self.breakPointController.breakPoints machBinaries:machBinaries];
+	NSArray<ZGMachBinary *> *machBinaries = [ZGMachBinary machBinariesInProcess:watchProcess];
+	ZGInstruction *instruction = [ZGDebuggerUtilities findInstructionBeforeAddress:instructionAddress inProcess:watchProcess withBreakPoints:_breakPointController.breakPoints machBinaries:machBinaries];
 	
 	if (instruction == nil)
 	{
@@ -333,20 +310,20 @@
 	
 	ZGWatchVariable *newWatchVariable = [[ZGWatchVariable alloc] initWithInstruction:instruction registersState:registersState];
 	
-	[self.foundWatchVariablesDictionary setObject:newWatchVariable forKey:instructionAddressNumber];
-	[self.foundWatchVariables addObject:newWatchVariable];
+	[_foundWatchVariablesDictionary setObject:newWatchVariable forKey:instructionAddressNumber];
+	[_foundWatchVariables addObject:newWatchVariable];
 	
 	[self updateAddButton];
 	
-	[self.tableView reloadData];
+	[_tableView reloadData];
 	
-	ZGDeliverUserNotification(ZGLocalizableWatchVariableString(@"foundInstructionNotificationTitle"), self.watchProcess.name, [NSString stringWithFormat:ZGLocalizableWatchVariableString(@"foundInstructionNotificationMessageFormat"), instruction.text]);
+	ZGDeliverUserNotification(ZGLocalizableWatchVariableString(@"foundInstructionNotificationTitle"), _watchProcess.name, [NSString stringWithFormat:ZGLocalizableWatchVariableString(@"foundInstructionNotificationMessageFormat"), instruction.text], nil);
 }
 
 - (void)watchVariable:(ZGVariable *)variable withWatchPointType:(ZGWatchPointType)watchPointType inProcess:(ZGProcess *)process attachedToWindow:(NSWindow *)parentWindow completionHandler:(watch_variable_completion_t)completionHandler
 {
 	ZGBreakPoint *breakPoint = nil;
-	if (![self.breakPointController addWatchpointOnVariable:variable inProcess:process watchPointType:watchPointType delegate:self getBreakPoint:&breakPoint])
+	if (![_breakPointController addWatchpointOnVariable:variable inProcess:process watchPointType:watchPointType delegate:self getBreakPoint:&breakPoint])
 	{
 		ZGRunAlertPanelWithOKButton(
 						ZGLocalizableWatchVariableString(@"failedToWatchVariableAlertTitle"),
@@ -354,64 +331,57 @@
 		return;
 	}
 	
-	[self window]; // ensure window is loaded
+	NSWindow *window = ZGUnwrapNullableObject([self window]); // ensure window is loaded
 	
 	[self updateAddButton];
 	
-	self.statusTextField.stringValue = [NSString stringWithFormat:ZGLocalizableWatchVariableString((watchPointType == ZGWatchPointWrite) ? @"watchWriteAccessesStatusFormat" : @"watchReadAndWriteAccessesStatusFormat"), breakPoint.watchSize * 8, variable.addressStringValue];
+	_statusTextField.stringValue = [NSString stringWithFormat:ZGLocalizableWatchVariableString((watchPointType == ZGWatchPointWrite) ? @"watchWriteAccessesStatusFormat" : @"watchReadAndWriteAccessesStatusFormat"), breakPoint.watchSize * 8, variable.addressStringValue];
 	
-	[self.progressIndicator startAnimation:nil];
-	[self.tableView reloadData];
+	[_progressIndicator startAnimation:nil];
+	[_tableView reloadData];
 	
-	[NSApp
-	 beginSheet:self.window
-	 modalForWindow:parentWindow
-	 modalDelegate:nil
-	 didEndSelector:nil
-	 contextInfo:NULL];
+	[parentWindow beginSheet:window completionHandler:^(NSModalResponse __unused returnCode) {
+	}];
 	
-	self.watchProcess = process;
-	self.completionHandler = completionHandler;
+	_watchProcess = process;
+	_completionHandler = [completionHandler copy];
 	
-	self.foundWatchVariables = [[NSMutableArray alloc] init];
-	self.foundWatchVariablesDictionary = [[NSMutableDictionary alloc] init];
+	_foundWatchVariables = [[NSMutableArray alloc] init];
+	_foundWatchVariablesDictionary = [[NSMutableDictionary alloc] init];
 	
-	if ([[NSProcessInfo processInfo] respondsToSelector:@selector(beginActivityWithOptions:reason:)])
-	{
-		self.watchActivity = [[NSProcessInfo processInfo] beginActivityWithOptions:NSActivityUserInitiated reason:@"Watching Data Accesses"];
-	}
+	_watchActivity = [[NSProcessInfo processInfo] beginActivityWithOptions:NSActivityUserInitiated reason:@"Watching Data Accesses"];
 }
 
 #pragma mark Selection Accessors
 
 - (NSIndexSet *)selectedWatchVariableIndexes
 {
-	NSIndexSet *tableIndexSet = self.tableView.selectedRowIndexes;
-	NSInteger clickedRow = self.tableView.clickedRow;
+	NSIndexSet *tableIndexSet = _tableView.selectedRowIndexes;
+	NSInteger clickedRow = _tableView.clickedRow;
 	
 	return (clickedRow >= 0 && ![tableIndexSet containsIndex:(NSUInteger)clickedRow]) ? [NSIndexSet indexSetWithIndex:(NSUInteger)clickedRow] : tableIndexSet;
 }
 
-- (NSArray *)selectedWatchVariables
+- (NSArray<ZGWatchVariable *> *)selectedWatchVariables
 {
-	return [self.foundWatchVariables objectsAtIndexes:[self selectedWatchVariableIndexes]];
+	return [_foundWatchVariables objectsAtIndexes:[self selectedWatchVariableIndexes]];
 }
 
 #pragma mark Table View
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)__unused tableView
 {
-	return (NSInteger)self.foundWatchVariables.count;
+	return (NSInteger)_foundWatchVariables.count;
 }
 
 - (id)tableView:(NSTableView *)__unused tableView objectValueForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)rowIndex
 {
-	if (rowIndex < 0 || (NSUInteger)rowIndex >= self.foundWatchVariables.count)
+	if (rowIndex < 0 || (NSUInteger)rowIndex >= _foundWatchVariables.count)
 	{
 		return nil;
 	}
 	
-	ZGWatchVariable *watchVariable = self.foundWatchVariables[(NSUInteger)rowIndex];
+	ZGWatchVariable *watchVariable = _foundWatchVariables[(NSUInteger)rowIndex];
 	
 	if ([tableColumn.identifier isEqualToString:@"count"])
 	{
@@ -435,20 +405,20 @@
 
 - (void)tableView:(NSTableView *)__unused tableView setObjectValue:(id)object forTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)rowIndex
 {
-	if (rowIndex < 0 || (NSUInteger)rowIndex >= self.foundWatchVariables.count)
+	if (rowIndex < 0 || (NSUInteger)rowIndex >= _foundWatchVariables.count)
 	{
 		return;
 	}
 	
-	ZGWatchVariable *watchVariable = self.foundWatchVariables[(NSUInteger)rowIndex];
+	ZGWatchVariable *watchVariable = _foundWatchVariables[(NSUInteger)rowIndex];
 	if ([tableColumn.identifier isEqualToString:@"enabled"])
 	{
-		watchVariable.instruction.variable.enabled = [object boolValue];
+		watchVariable.instruction.variable.enabled = [(NSString *)object boolValue];
 		
-		NSArray *selectedWatchVariables = [self selectedWatchVariables];
+		NSArray<ZGWatchVariable *> *selectedWatchVariables = [self selectedWatchVariables];
 		if (selectedWatchVariables.count > 1 && [selectedWatchVariables containsObject:watchVariable])
 		{
-			self.tableView.shouldIgnoreNextSelection = YES;
+			_tableView.shouldIgnoreNextSelection = YES;
 			for (ZGWatchVariable *selectedWatchVariable in selectedWatchVariables)
 			{
 				if (watchVariable != selectedWatchVariable)
@@ -466,7 +436,7 @@
 {
 	if ([menuItem action] == @selector(showMemoryViewer:) || [menuItem action] == @selector(showDebugger:))
 	{
-		if ([[self selectedWatchVariables] count] != 1 || self.watchProcess == nil)
+		if ([[self selectedWatchVariables] count] != 1 || _watchProcess == nil)
 		{
 			return NO;
 		}
@@ -493,13 +463,13 @@
 
 - (IBAction)copy:(id)__unused sender
 {
-	NSArray *selectedWatchVariables = [self selectedWatchVariables];
+	NSArray<ZGWatchVariable *> *selectedWatchVariables = [self selectedWatchVariables];
 	for (ZGWatchVariable *watchVariable in selectedWatchVariables)
 	{
 		[self annotateWatchVariableDescription:watchVariable];
 	}
 	
-	NSArray *variables = [selectedWatchVariables zgMapUsingBlock:^(ZGWatchVariable *watchVariable) {
+	NSArray<ZGVariable *> *variables = [selectedWatchVariables zgMapUsingBlock:^(ZGWatchVariable *watchVariable) {
 		return watchVariable.instruction.variable;
 	}];
 	
@@ -515,13 +485,23 @@
 - (IBAction)showMemoryViewer:(id)__unused sender
 {
 	ZGWatchVariable *selectedWatchVariable = [[self selectedWatchVariables] firstObject];
-	[ZGNavigationPost postShowMemoryViewerWithProcess:self.watchProcess address:selectedWatchVariable.instruction.variable.address selectionLength:selectedWatchVariable.instruction.variable.size];
+	id <ZGShowMemoryWindow> delegate = _delegate;
+	ZGProcess *watchProcess = _watchProcess;
+	if (watchProcess != nil)
+	{
+		[delegate showMemoryViewerWindowWithProcess:watchProcess address:selectedWatchVariable.instruction.variable.address selectionLength:selectedWatchVariable.instruction.variable.size];
+	}
 }
 
 - (IBAction)showDebugger:(id)__unused sender
 {
 	ZGWatchVariable *selectedWatchVariable = [[self selectedWatchVariables] firstObject];
-	[ZGNavigationPost postShowDebuggerWithProcess:self.watchProcess address:selectedWatchVariable.instruction.variable.address];
+	id <ZGShowMemoryWindow> delegate = _delegate;
+	ZGProcess *watchProcess = _watchProcess;
+	if (watchProcess != nil)
+	{
+		[delegate showDebuggerWindowWithProcess:watchProcess address:selectedWatchVariable.instruction.variable.address];
+	}
 }
 
 @end

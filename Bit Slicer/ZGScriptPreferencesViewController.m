@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 4/28/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,20 +37,17 @@
 
 #define ZGScriptPreferencesLocalizationTable @"[Code] Script Preferences"
 
-enum ZGScriptIndentationTag
+typedef NS_ENUM(NSInteger, ZGScriptIndentationTag)
 {
 	ZGScriptIndentationTabsTag,
 	ZGScriptIndentationSpacesTag
 };
 
-@interface ZGScriptPreferencesViewController ()
-
-@property (nonatomic, assign) IBOutlet NSPopUpButton *applicationEditorsPopUpButton;
-@property (nonatomic, assign) IBOutlet NSPopUpButton *indentationPopUpButton;
-
-@end
-
 @implementation ZGScriptPreferencesViewController
+{
+	IBOutlet NSPopUpButton *_applicationEditorsPopUpButton;
+	IBOutlet NSPopUpButton *_indentationPopUpButton;
+}
 
 #pragma mark Birth
 
@@ -73,7 +68,7 @@ enum ZGScriptIndentationTag
 #define EDITOR_ICON_SIZE NSMakeSize(16, 16)
 - (void)updateApplicationEditorsPopUpButton
 {
-	[self.applicationEditorsPopUpButton removeAllItems];
+	[_applicationEditorsPopUpButton removeAllItems];
 	
 	NSWorkspace *workspace = [NSWorkspace sharedWorkspace];
 	NSMenuItem *defaultEditorMenuItem = [[NSMenuItem alloc] initWithTitle:NSLocalizedStringFromTable(@"defaultPythonEditor", ZGScriptPreferencesLocalizationTable, nil) action:NULL keyEquivalent:@""];
@@ -81,47 +76,50 @@ enum ZGScriptIndentationTag
 	
 	defaultEditorMenuItem.image = [extensionIcon copy];
 	[defaultEditorMenuItem.image setSize:EDITOR_ICON_SIZE];
-	[self.applicationEditorsPopUpButton.menu addItem:defaultEditorMenuItem];
+	[_applicationEditorsPopUpButton.menu addItem:defaultEditorMenuItem];
 	
 	NSString *emptyPythonFile = [ZGAppPathUtilities createEmptyPythonFile];
-	NSArray *editorURLs = CFBridgingRelease(LSCopyApplicationURLsForURL((__bridge CFURLRef)([NSURL fileURLWithPath:emptyPythonFile]), kLSRolesEditor));
+	NSArray<NSURL *> *editorURLs = CFBridgingRelease(LSCopyApplicationURLsForURL((__bridge CFURLRef)([NSURL fileURLWithPath:emptyPythonFile]), kLSRolesEditor));
 	
 	if (editorURLs.count == 0)
 	{
 		return;
 	}
 	
-	[self.applicationEditorsPopUpButton.menu addItem:[NSMenuItem separatorItem]];
+	[_applicationEditorsPopUpButton.menu addItem:[NSMenuItem separatorItem]];
 	
-	NSMutableArray *addedEditorPaths = [NSMutableArray array];
+	NSMutableArray<NSString *> *addedEditorPaths = [NSMutableArray array];
 	for (NSURL *editorURL in editorURLs)
 	{
-		NSString *editorPath = [editorURL relativePath];
-		NSString *editorName = [[editorPath lastPathComponent] stringByDeletingPathExtension];
+		NSString *editorName = [[editorURL lastPathComponent] stringByDeletingPathExtension];
 		if (![addedEditorPaths containsObject:editorName])
 		{
-			NSImage *icon = [workspace iconForFile:editorPath];
-			
-			NSMenuItem *editorMenuItem = [[NSMenuItem alloc] initWithTitle:editorName action:NULL keyEquivalent:@""];
-			editorMenuItem.image = [icon copy];
-			[editorMenuItem.image setSize:EDITOR_ICON_SIZE];
-			
-			[self.applicationEditorsPopUpButton.menu addItem:editorMenuItem];
-			[addedEditorPaths addObject:editorName];
+			NSString *editorURLPath = editorURL.path;
+			if (editorURLPath != nil)
+			{
+				NSImage *icon = [workspace iconForFile:editorURLPath];
+				
+				NSMenuItem *editorMenuItem = [[NSMenuItem alloc] initWithTitle:editorName action:NULL keyEquivalent:@""];
+				editorMenuItem.image = [icon copy];
+				[editorMenuItem.image setSize:EDITOR_ICON_SIZE];
+				
+				[_applicationEditorsPopUpButton.menu addItem:editorMenuItem];
+				[addedEditorPaths addObject:editorName];
+			}
 		}
 	}
 	
 	NSString *defaultEditor = [[NSUserDefaults standardUserDefaults] objectForKey:ZGScriptDefaultApplicationEditorKey];
 	if (defaultEditor.length > 0)
 	{
-		[self.applicationEditorsPopUpButton selectItemWithTitle:defaultEditor];
+		[_applicationEditorsPopUpButton selectItemWithTitle:defaultEditor];
 	}
 }
 
 - (IBAction)changeDefaultApplicationEditor:(id)__unused sender
 {
-	NSMenuItem *selectedItem = self.applicationEditorsPopUpButton.selectedItem;
-	NSString *chosenEditor = (self.applicationEditorsPopUpButton.itemArray.firstObject == selectedItem) ? @"" : selectedItem.title;
+	NSMenuItem *selectedItem = _applicationEditorsPopUpButton.selectedItem;
+	NSString *chosenEditor = (_applicationEditorsPopUpButton.itemArray.firstObject == selectedItem) ? @"" : selectedItem.title;
 	[[NSUserDefaults standardUserDefaults] setObject:chosenEditor forKey:ZGScriptDefaultApplicationEditorKey];
 }
 
@@ -129,7 +127,7 @@ enum ZGScriptIndentationTag
 
 - (void)updateIndentationPopUpButton
 {
-	[self.indentationPopUpButton removeAllItems];
+	[_indentationPopUpButton removeAllItems];
 	
 	NSMenuItem *tabsMenuItem = [[NSMenuItem alloc] initWithTitle:NSLocalizedStringFromTable(@"tabsIndentation", ZGScriptPreferencesLocalizationTable, nil) action:NULL keyEquivalent:@""];
 	tabsMenuItem.tag = ZGScriptIndentationTabsTag;
@@ -137,16 +135,16 @@ enum ZGScriptIndentationTag
 	NSMenuItem *spacesMenuItem = [[NSMenuItem alloc] initWithTitle:NSLocalizedStringFromTable(@"spacesIndentation", ZGScriptPreferencesLocalizationTable, nil) action:NULL keyEquivalent:@""];
 	spacesMenuItem.tag = ZGScriptIndentationSpacesTag;
 	
-	[self.indentationPopUpButton.menu addItem:tabsMenuItem];
-	[self.indentationPopUpButton.menu addItem:spacesMenuItem];
+	[_indentationPopUpButton.menu addItem:tabsMenuItem];
+	[_indentationPopUpButton.menu addItem:spacesMenuItem];
 	
 	BOOL usesTabs = [[NSUserDefaults standardUserDefaults] boolForKey:ZGScriptIndentationUsingTabsKey];
-	[self.indentationPopUpButton selectItem:usesTabs ? tabsMenuItem : spacesMenuItem];
+	[_indentationPopUpButton selectItem:usesTabs ? tabsMenuItem : spacesMenuItem];
 }
 
 - (IBAction)changeDefaultScriptIndentation:(id)__unused sender
 {
-	BOOL usesTabs = ([self.indentationPopUpButton selectedTag]) == ZGScriptIndentationTabsTag;
+	BOOL usesTabs = ([_indentationPopUpButton selectedTag]) == ZGScriptIndentationTabsTag;
 	[[NSUserDefaults standardUserDefaults] setBool:usesTabs forKey:ZGScriptIndentationUsingTabsKey];
 }
 

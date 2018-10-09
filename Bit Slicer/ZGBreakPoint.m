@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 12/29/12.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,14 +33,6 @@
 #import "ZGBreakPoint.h"
 #import "ZGProcess.h"
 
-@interface ZGBreakPoint ()
-
-@property (nonatomic) ZGMemoryMap task;
-@property (nonatomic) ZGProcess *process;
-@property (nonatomic) ZGBreakPointType type;
-
-@end
-
 @implementation ZGBreakPoint
 
 - (id)initWithProcess:(ZGProcess *)process type:(ZGBreakPointType)type delegate:(id <ZGBreakPointDelegate>)delegate
@@ -50,12 +40,11 @@
 	self = [super init];
 	if (self != nil)
 	{
-		self.cacheDictionary = [NSMutableDictionary dictionary];
-		self.process = [[ZGProcess alloc] initWithProcess:process];
-		self.type = type;
-		self.delegate = delegate;
-		self.task = process.processTask;
-		self.delegate = delegate;
+		_cacheDictionary = [NSMutableDictionary dictionary];
+		_process = [[ZGProcess alloc] initWithProcess:process];
+		_type = type;
+		_task = process.processTask;
+		_delegate = delegate;
 	}
 	return self;
 }

@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 5/11/11.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,20 +34,26 @@
 #import <HexFiend/HexFiend.h>
 #import "ZGMemoryTypes.h"
 #import "ZGMemoryNavigationWindowController.h"
+#import "ZGMemorySelectionDelegate.h"
 
+@class ZGBreakPoint;
 @class ZGProcess;
 
-#define DEFAULT_MEMORY_VIEWER_SELECTION_LENGTH 4
+NS_ASSUME_NONNULL_BEGIN
 
 @interface ZGMemoryViewerController : ZGMemoryNavigationWindowController <NSWindowDelegate>
 
-@property (nonatomic) ZGMemoryAddress currentMemoryAddress;
-@property (nonatomic) ZGMemorySize currentMemorySize;
+- (id)initWithProcessTaskManager:(ZGProcessTaskManager *)processTaskManager rootlessConfiguration:(nullable ZGRootlessConfiguration *)rootlessConfiguration haltedBreakPoints:(NSMutableArray<ZGBreakPoint *> *)haltedBreakPoints delegate:(nullable id <ZGChosenProcessDelegate, ZGShowMemoryWindow, ZGMemorySelectionDelegate>)delegate;
+
+@property (nonatomic, readonly) ZGMemoryAddress currentMemoryAddress;
+@property (nonatomic, readonly) ZGMemorySize currentMemorySize;
 
 - (void)updateWindowAndReadMemory:(BOOL)shouldReadMemory;
 
 - (void)jumpToMemoryAddress:(ZGMemoryAddress)memoryAddress withSelectionLength:(ZGMemorySize)selectionLength inProcess:(ZGProcess *)requestedProcess;
 
-- (IBAction)toggleDataInspector:(id)sender;
+- (IBAction)toggleDataInspector:(nullable id)sender;
 
 @end
+
+NS_ASSUME_NONNULL_END

@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 4/6/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,8 +35,12 @@
 
 @class ZGProcess;
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface ZGMemoryDumpRangeWindowController : NSWindowController
 
 - (void)attachToWindow:(NSWindow *)parentWindow withProcess:(ZGProcess *)process requestedAddressRange:(HFRange)requestedAddressRange;
 
 @end
+
+NS_ASSUME_NONNULL_END

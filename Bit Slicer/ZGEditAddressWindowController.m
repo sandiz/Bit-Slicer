@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 11/29/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,17 +33,15 @@
 #import "ZGEditAddressWindowController.h"
 #import "ZGVariableController.h"
 #import "ZGVariable.h"
-
-@interface ZGEditAddressWindowController ()
-
-@property (nonatomic) ZGVariableController *variableController;
-
-@property (nonatomic, assign) IBOutlet NSTextField *addressTextField;
-@property (nonatomic) ZGVariable *variable;
-
-@end
+#import "ZGNullability.h"
 
 @implementation ZGEditAddressWindowController
+{
+	ZGVariableController * _Nonnull _variableController;
+	ZGVariable * _Nullable _variable;
+	
+	IBOutlet NSTextField *_addressTextField;
+}
 
 - (NSString *)windowNibName
 {
@@ -57,46 +53,42 @@
 	self = [super init];
 	if (self != nil)
 	{
-		self.variableController = variableController;
+		_variableController = variableController;
 	}
 	return self;
 }
 
 - (void)requestEditingAddressFromVariable:(ZGVariable *)variable attachedToWindow:(NSWindow *)parentWindow
 {
-	[self window]; // ensure window is loaded
+	NSWindow *window = ZGUnwrapNullableObject([self window]); // ensure window is loaded
 	
-	self.variable = variable;
-	self.addressTextField.stringValue = variable.addressFormula;
+	_variable = variable;
+	_addressTextField.stringValue = variable.addressFormula;
 	
-	[self.addressTextField selectText:nil];
+	[_addressTextField selectText:nil];
 	
-	[NSApp
-	 beginSheet:self.window
-	 modalForWindow:parentWindow
-	 modalDelegate:self
-	 didEndSelector:nil
-	 contextInfo:NULL];
+	[parentWindow beginSheet:window completionHandler:^(NSModalResponse __unused returnCode) {
+	}];
 }
 
 - (IBAction)editAddress:(id)__unused sender
 {
-	[NSApp endSheet:self.window];
-	[self.window close];
+	NSWindow *window = ZGUnwrapNullableObject([self window]);
+	[NSApp endSheet:window];
+	[window close];
 	
-	[self.variableController
-	 editVariable:self.variable
-	 addressFormula:self.addressTextField.stringValue];
+	[_variableController editVariable:ZGUnwrapNullableObject(_variable) addressFormula:_addressTextField.stringValue];
 	
-	self.variable = nil;
+	_variable = nil;
 }
 
 - (IBAction)cancelEditingAddress:(id)__unused sender
 {
-	[NSApp endSheet:self.window];
-	[self.window close];
+	NSWindow *window = ZGUnwrapNullableObject([self window]);
+	[NSApp endSheet:window];
+	[window close];
 	
-	self.variable = nil;
+	_variable = nil;
 }
 
 @end

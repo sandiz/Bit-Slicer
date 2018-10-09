@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 3/14/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,24 +38,25 @@
 - (id)initWithProcessIdentifier:(pid_t)processIdentifier observer:(id)observer
 {
 	self = [super init];
-	if (self)
+	if (self != nil)
 	{
 		ZGRunningProcess *runningProcess = [[ZGRunningProcess alloc] initWithProcessIdentifier:processIdentifier];
 		
-		self.runningProcess = runningProcess;
-		self.observer = observer;
+		_runningProcess = runningProcess;
+		_observer = observer;
 	}
 	return self;
 }
 
 - (BOOL)isEqual:(id)object
 {
-	return [self.runningProcess isEqual:[object runningProcess]] && self.observer == [object observer];
+	return [_runningProcess isEqual:[(ZGRunningProcessObserver *)object runningProcess]] && _observer == [(ZGRunningProcessObserver *)object observer];
 }
 
 - (NSUInteger)hash
 {
-	return [[NSString stringWithFormat:@"%lu_%lu", self.runningProcess.hash, [self.observer hash]] hash];
+	ZGRunningProcessObserver *observer = _observer; // nothing we can really do if _observer == nil?
+	return [[NSString stringWithFormat:@"%lu_%lu", _runningProcess.hash, [observer hash]] hash];
 }
 
 @end

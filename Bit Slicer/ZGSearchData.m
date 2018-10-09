@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 7/21/12.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,7 +31,7 @@
  */
 
 #import "ZGSearchData.h"
-#import "ZGVirtualMemoryHelpers.h"
+#import "ZGDebugLogging.h"
 
 @implementation ZGSearchData
 
@@ -47,10 +45,18 @@
 	self = [super init];
 	if (self != nil)
 	{
-		UCCreateCollator(NULL, 0, kUCCollateCaseInsensitiveMask, &_collator);
-		self.endAddress = MAX_MEMORY_ADDRESS;
-		self.protectionMode = ZGProtectionAll;
-		self.epsilon = DEFAULT_FLOATING_POINT_EPSILON;
+		if (UCCreateCollator(NULL, 0, kUCCollateCaseInsensitiveMask, &_collator) != noErr)
+		{
+			ZG_LOG(@"Error: Failed to create Collator..");
+		}
+		
+		_endAddress = MAX_MEMORY_ADDRESS;
+		_protectionMode = ZGProtectionAll;
+		_epsilon = DEFAULT_FLOATING_POINT_EPSILON;
+		
+		_dataSize = dataSize;
+		_dataAlignment = dataAlignment;
+		_pointerSize = pointerSize;
 		
 		self.searchValue = searchValue;
 		self.dataSize = dataSize;
@@ -59,6 +65,7 @@
 		
 		self.maxPointerOffset = 2048;
 		self.numberOfPointerLevels = 5;
+		[self setSearchValue:searchValue];
 	}
 	return self;
 }
@@ -67,12 +74,12 @@
 {
 	UCDisposeCollator(&_collator);
 	
-	self.rangeValue = NULL;
-	self.swappedValue = NULL;
-	self.byteArrayFlags = NULL;
-	self.searchValue = NULL;
-	self.savedData = nil;
-	self.additiveConstant = NULL;
+	[self setRangeValue:NULL];
+	[self setSwappedValue:NULL];
+	[self setByteArrayFlags:NULL];
+	[self setSearchValue:NULL];
+	[self setSavedData:NULL];
+	[self setAdditiveConstant:NULL];
 }
 
 - (void)setSearchValue:(void *)searchValue

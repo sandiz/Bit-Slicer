@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 3/9/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,10 +30,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _ZG_VARIABLE_TYPES_H
-#define _ZG_VARIABLE_TYPES_H
+#ifndef ZG_VARIABLE_TYPES_H
+#define ZG_VARIABLE_TYPES_H
 
-typedef enum
+typedef enum : NSInteger
 {
 	ZGInt8 = 0,
 	ZGInt16,
@@ -50,7 +48,7 @@ typedef enum
 	ZGScript
 } ZGVariableType;
 
-typedef enum
+typedef enum : NSInteger
 {
 	ZGSigned = 0,
 	ZGUnsigned

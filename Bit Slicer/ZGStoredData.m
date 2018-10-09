@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 2/2/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,17 +32,7 @@
 
 #import "ZGStoredData.h"
 #import "ZGVirtualMemory.h"
-#import "ZGVirtualMemoryHelpers.h"
-#import "ZGSearchData.h"
 #import "ZGRegion.h"
-#import "ZGSearchProgress.h"
-#import "ZGUtilities.h"
-
-@interface ZGStoredData ()
-
-@property (nonatomic) NSArray *regions;
-
-@end
 
 @implementation ZGStoredData
 
@@ -64,7 +52,7 @@
 			[newRegions addObject:newRegion];
 		}
 	}
-	return [[self alloc] initWithRegions:newRegions];
+	return [(ZGStoredData *)[self alloc] initWithRegions:newRegions];
 }
 
 + (instancetype)storedDataFromProcessTask:(ZGMemoryMap)processTask
@@ -72,7 +60,7 @@
 	return [self storedDataFromProcessTask:processTask regions:[ZGRegion regionsFromProcessTask:processTask]];
 }
 
-- (id)initWithRegions:(NSArray *)regions
+- (id)initWithRegions:(NSArray<ZGRegion *> *)regions
 {
 	self = [super init];
 	if (self != nil)
@@ -84,7 +72,7 @@
 
 - (void)dealloc
 {
-	for (ZGRegion *region in self.regions)
+	for (ZGRegion *region in _regions)
 	{
 		ZGFreeBytes(region.bytes, region.size);
 	}

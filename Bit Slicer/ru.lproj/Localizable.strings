@@ -1,0 +1,14 @@
+/* OK that would show up in alerts usually */
+"OK" = "OK";
+
+/* Cancel that would show up in alerts usually */
+"Cancel" = "Отмена";
+
+/* 'None' selection label for AGScopeBar (scope bar used in search window) */
+"(None)" = "(ни одного)";
+
+/* 'Multiple' selection label for AGScopeBar (scope bar used in search window) */
+"(Multiple)" = "(несколько)";
+
+/* 'New Tab' menu item for 10.12 and later for creating a new tabbed search window */
+"New Tab" = "Новая вкладка";

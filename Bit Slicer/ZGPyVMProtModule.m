@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 5/13/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,8 +31,8 @@
  */
 
 #import "ZGPyVMProtModule.h"
-#import "ZGPyUtilities.h"
-#import "ZGUtilities.h"
+#import "ZGPyModuleAdditions.h"
+#import "ZGVirtualMemory.h"
 
 #define VMPROT_MODULE_NAME "vmprot"
 

@@ -1,0 +1,176 @@
+/* Scope Bar Protection Group */
+"scopeBarProtectionGroup" = "Защита на:";
+
+/* Scope Bar Protection All */
+"scopeBarProtectionAllItem" = "Все";
+
+/* Scope Bar Protection Write */
+"scopeBarProtectionWriteItem" = "Запись";
+
+/* Scope Bar Protection Execute */
+"scopeBarProtectionExecuteItem" = "Выполнение";
+
+/* Scope Bar Qualifier Group */
+"scopeBarQualifierGroup" = "Целочисленный тип:";
+
+/* Scope Bar Qualifier Signed */
+"scopeBarQualifierSignedItem" = "Знаковый";
+
+/* Scope Bar Qualifier Unsigned */
+"scopeBarQualifierUnsignedItem" = "Не знаковый";
+
+/* Scope Bar Matching Group */
+"scopeBarStringMatchingGroup" = "Параметры строк:";
+
+/* Scope Bar Matching Ignore Case */
+"scopeBarStringMatchingIgnoreCaseItem" = "Не учитывать регистр";
+
+/* Scope Bar Matching Null Terminated */
+"scopeBarStringMatchingNullTerminatedItem" = "Нуль-терминальные";
+
+/* Scope Bar Endianness Group */
+"scopeBarEndiannessGroup" = "Порядок байтов:";
+
+/* Scope Bar Little Endian */
+"scopeBarEndianLittleItem" = "Прямой";
+
+/* Scope Bar Big Endian */
+"scopeBarEndianBigItem" = "Обратный";
+
+/* Scope Bar accessory for Below label when doing > value search; also used for error reporting */
+"searchBelowLabel" = "но меньше";
+
+/* Scope Bar accessory for Above label when doing < value search; also used for error reporting */
+"searchAboveLabel" = "но больше";
+
+/* Scope Bar accessory for Round Error label when doing = or != float/double value search; also used for error reporting */
+"searchRoundErrorLabel" = "Погрешность";
+
+/* Equals Operator Title */
+"equalsOperatorTitle" = "равно";
+
+/* Not Equals Operator Title */
+"notEqualsOperatorTitle" = "не равно";
+
+/* Greater Than Operator Title */
+"greaterThanOperatorTitle" = "больше чем";
+
+/* Less Than Operator Title */
+"lessThanOperatorTitle" = "меньше чем";
+
+/* Undo Data Type Change Action */
+"undoDataTypeChangeAction" = "Изменение типа данных";
+
+/* Clear Search Variables Action Menu Item Title */
+"clearSearchVariablesTitle" = "Очистить поиск";
+
+/* Clear Variables Action Menu Item Title */
+"clearVariablesTitle" = "Очистить переменные";
+
+/* Freeze single variable menu item title */
+"freezeSingleVariableTitle" = "Заморозить переменную";
+
+/* Freeze muitiple variables menu item title */
+"freezeMulitipleVariablesTitle" = "Заморозить переменные";
+
+/* Unfreeze single variable menu item title */
+"unfreezeSingleVariableTitle" = "Разморозить переменную";
+
+/* Unfreeze muitiple variables menu item title */
+"unfreezeMultipleVariablesTitle" = "Разморозить переменные";
+
+/* Edit single variable value menu item title */
+"editSingleVariableValueTitle" = "Изменить значение…";
+
+/* Edit multiple variable values menu item title */
+"editMultipleVariableValuesTitle" = "Изменить значения…";
+
+/* Edit single variable size menu item title */
+"editSingleVariableSizeTitle" = "Изменить размер переменной…";
+
+/* Edit multiple variable sizes menu item title */
+"editMultipleVariableSizesTitle" = "Изменить размер переменных…";
+
+/* Relativize single variable menu item title */
+"relativizeSingleVariableTitle" = "Релятивизировать переменную";
+
+/* Relativize multiple variables menu item title */
+"relativizeMultipleVariablesTitle" = "Релятивизировать переменные";
+
+/* NOP single variable menu item title */
+"nopSingleVariableTitle" = "NOP-переменная";
+
+/* NOP multiple variables menu item title */
+"nopMultipleVariablesTitle" = "NOP-переменные";
+
+/* Previous Operator menu item title */
+"previousOperatorMenuItem" = "Предыдущий оператор";
+
+/* Next Operator menu item title */
+"nextOperatorMenuItem" = "Следующий оператор";
+
+/* Title of Stored Value menu item in search menu of the search field */
+"storedValueTokenTitle" = "Сохраненное значение";
+
+/* Name of Stored Value Token in search field */
+"storedValueTokenName" = "$StoredValue";
+
+/* Tool tip for Store Values button */
+"storeValuesButtonToolTip" = "Сделать снимок всех значений присутствующих в памяти. Это поможет, не зная величин, находить нужные значения по их отклонению от первоначальных";
+
+/* Alert Title that no Stored Values are available when searching with a stored value token */
+"noStoredValuesAlertTitle" = "Нет таких значений, среди сохраненных";
+
+/* Alert Message that no Stored Values are available when searching with a stored value token */
+"noStoredValuesAlertMessage" = "Нет сохраненых значений для сравнения. Пожалуйста, сделайте снимок всех значений прежде чем продолжить.";
+
+/* Search Finished Notification Title */
+"searchFinishedNotificationTitle" = "Поиск завершен";
+
+/* Undo action name for a Search */
+"undoSearchAction" = "Поиск";
+
+/* Label title for Beginning Address field */
+"beginningAddressLabel" = "Начальный адрес";
+
+/* Label title for Ending Address field */
+"endingAddressLabel" = "Конечный адрес";
+
+/* Error Message format when Above, Below, Round Error, Beginning Address, Ending Address fields have invalid input */
+"invalidFlagsFieldErrorMessageFormat" = "Значение, соответствующее '%@' должно быть правильным выражением или оставаться пустым.";
+
+/* Error Message for when Beginning Address >= Ending Address */
+"endingAddressIsNotGreaterThanBeginningAddressErrorMessage" = "Значение Начального адреса должно быть меньше, чем значение в Конечном адресе, либо одно или оба поля можгут оставаться пустыми.";
+
+/* Error message for when the selected data type to seach is a numerical one, and the expression cannot be parsed */
+"invalidNumericalSearchExpressionErrorMessage" = "Поисковое значение должно быть числовым.";
+
+/* Error Message when attempting to do stored value byte array search */
+"storedValueSearchUnsupportedForByteArrays" = "Сравнение сохраненных значений не работает для Байтовых массивов";
+
+/* Error Message when attempting to do stored value strings search */
+"storedValueSearchUnsupportedForStrings" = "Сравнение сохраненных значений не работает для Строк";
+
+/* Error Message when failing to parse a linear stored value expression */
+"linearExpressionParseFailureErrorMessage" = "Выражение поиска не может быть разобрано. Пожалуйста, попробуйте более простое выражение.";
+
+/* Generic Error Alert Title for when a field could not be parsed properly */
+"invalidSearchInputAlertTitle" = "Неверный поисковый запрос";
+
+/* Label for when search is being cancelled */
+"cancelingSearchStatusLabel" = "Отмена поиска…";
+
+/* Label for when Storing Values is being cancelled */
+"cancelingStoringValuesStatusLabel" = "Отмена снимка значений…";
+
+/* Label for Storing all Values operation is occuring */
+"storingValuesStatusLabel" = "Сохранение всех значений…";
+
+/* Alert Title indicating that searching is failing */
+"searchFailureAlertTitle" = "Ошибка поиска";
+
+/* Alert Message indicating that searching is failing due to system protections */
+"searchFailureSystemProtectionAlertMessageFormat" = "Память %@ не может быть найдена из-за системных защит.";
+
+/* Alert Message indicating that searching is failing due to the target runnning with elevated privileges */
+"searchFailureElevatedPrivilegesAlertMessageFormat" = "%@ cannot be searched because it may be running with elevated privileges.";

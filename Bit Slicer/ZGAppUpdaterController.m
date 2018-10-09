@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 3/9/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,6 +33,7 @@
 #import "ZGAppUpdaterController.h"
 
 #import <Sparkle/Sparkle.h>
+#import "ZGNullability.h"
 
 #define ZG_CHECK_FOR_UPDATES @"SUEnableAutomaticChecks"
 #define ZG_CHECK_FOR_ALPHA_UPDATES @"ZG_CHECK_FOR_ALPHA_UPDATES_2"
@@ -42,20 +41,17 @@
 #define SU_FEED_URL_KEY @"SUFeedURL"
 #define SU_SEND_PROFILE_INFO_KEY @"SUSendProfileInfo"
 
-#define APPCAST_URL @"http://zorg.tejat.net/bitslicer/update.php"
-#define ALPHA_APPCAST_URL @"http://zorg.tejat.net/bitslicer/update_alpha.php"
-
-@interface ZGAppUpdaterController ()
-
-@property (nonatomic) SUUpdater *updater;
-
-@end
+#define APPCAST_URL @"https://zgcoder.net/bitslicer/update/appcast.xml"
+#define ALPHA_APPCAST_URL @"https://zgcoder.net/bitslicer/update/appcast_alpha.xml"
 
 @implementation ZGAppUpdaterController
+{
+	SPUUpdater * _Nonnull _updater;
+}
 
 + (BOOL)runningAlpha
 {
-	return [[[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"] rangeOfString:@"a"].location != NSNotFound;
+	return [(NSString *)[[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"] rangeOfString:@"a"].location != NSNotFound;
 }
 
 + (void)initialize
@@ -76,8 +72,20 @@
 	{
 		[self reloadValuesFromDefaults];
 		
-		self.updater = [[SUUpdater alloc] init];
+		NSBundle *updateBundle = [NSBundle mainBundle];
+		
+		id<SPUUserDriver> userDriver = [[SPUStandardUserDriver alloc] initWithHostBundle:updateBundle delegate:nil];
+		_updater = [[SPUUpdater alloc] initWithHostBundle:updateBundle applicationBundle:updateBundle userDriver:userDriver delegate:nil];
+		
 		[self updateFeedURL];
+		
+		NSError *updateError = nil;
+		if (![_updater startUpdater:&updateError])
+		{
+			NSLog(@"Error: Failed to start updater with error: %@", updateError);
+			// I don't want users stranded on old versions
+			abort();
+		}
 	}
 	return self;
 }
@@ -91,7 +99,7 @@
 
 - (void)updateFeedURL
 {
-	[self.updater setFeedURL:[NSURL URLWithString:self.checksForAlphaUpdates ? ALPHA_APPCAST_URL : APPCAST_URL]];
+	[_updater setFeedURL:ZGUnwrapNullableObject([NSURL URLWithString:_checksForAlphaUpdates ? ALPHA_APPCAST_URL : APPCAST_URL])];
 }
 
 - (void)setChecksForUpdates:(BOOL)checksForUpdates
@@ -121,7 +129,7 @@
 
 - (void)checkForUpdates
 {
-	[self.updater checkForUpdates:nil];
+	[_updater checkForUpdates];
 }
 
 @end

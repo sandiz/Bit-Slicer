@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 3/8/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,43 +31,23 @@
  */
 
 #import "ZGDocumentController.h"
-#import "ZGDebuggerController.h"
-#import "ZGProcessTaskManager.h"
-#import "ZGHotKeyCenter.h"
 #import "ZGDocument.h"
+#import "ZGDocumentWindowController.h"
 
 @implementation ZGDocumentController
 {
-	ZGProcessTaskManager *_processTaskManager;
-	ZGDebuggerController *_debuggerController;
-	ZGBreakPointController *_breakPointController;
-	ZGHotKeyCenter *_hotKeyCenter;
-	ZGLoggerWindowController *_loggerWindowController;
+	ZGDocumentWindowController * _Nonnull (^_makeDocumentWindowController)(void);
 }
 
-- (id)initWithProcessTaskManager:(ZGProcessTaskManager *)processTaskManager debuggerController:(ZGDebuggerController *)debuggerController breakPointController:(ZGBreakPointController *)breakPointController hotKeyCenter:(ZGHotKeyCenter *)hotKeyCenter loggerWindowController:(ZGLoggerWindowController *)loggerWindowController
+- (id)initWithMakeDocumentWindowController:(ZGDocumentWindowController * _Nonnull (^)(void))makeDocumentWindowController
 {
 	self = [super init];
 	if (self != nil)
 	{
-		_processTaskManager = processTaskManager;
-		_debuggerController = debuggerController;
-		_breakPointController = breakPointController;
-		_hotKeyCenter = hotKeyCenter;
-		_loggerWindowController = loggerWindowController;
+		assert(makeDocumentWindowController != NULL);
+		_makeDocumentWindowController = [makeDocumentWindowController copy];
 	}
 	return self;
-}
-
-- (void)initializeDocument:(ZGDocument *)document
-{
-	document.processTaskManager = _processTaskManager;
-	document.debuggerController = _debuggerController;
-	document.breakPointController = _breakPointController;
-	document.hotKeyCenter = _hotKeyCenter;
-	document.loggerWindowController = _loggerWindowController;
-	
-	document.lastChosenInternalProcessName = self.lastChosenInternalProcessName;
 }
 
 // Override makeDocumentXXX methods so we can initialize the document's properties
@@ -77,27 +55,27 @@
 
 - (id)makeDocumentForURL:(NSURL *)absoluteDocumentURL withContentsOfURL:(NSURL *)absoluteDocumentContentsURL ofType:(NSString *)typeName error:(NSError * __autoreleasing *)outError
 {
-	id document = [super makeDocumentForURL:absoluteDocumentURL withContentsOfURL:absoluteDocumentContentsURL ofType:typeName error:outError];
+	ZGDocument *document = [super makeDocumentForURL:absoluteDocumentURL withContentsOfURL:absoluteDocumentContentsURL ofType:typeName error:outError];
 	
-	[self initializeDocument:document];
+	document.makeDocumentWindowController = _makeDocumentWindowController;
 	
 	return document;
 }
 
 - (id)makeDocumentWithContentsOfURL:(NSURL *)absoluteURL ofType:(NSString *)typeName error:(NSError * __autoreleasing *)outError
 {
-	id document = [super makeDocumentWithContentsOfURL:absoluteURL ofType:typeName error:outError];
+	ZGDocument *document = [super makeDocumentWithContentsOfURL:absoluteURL ofType:typeName error:outError];
 	
-	[self initializeDocument:document];
+	document.makeDocumentWindowController = _makeDocumentWindowController;
 	
 	return document;
 }
 
 - (id)makeUntitledDocumentOfType:(NSString *)typeName error:(NSError * __autoreleasing *)outError
 {
-	id document = [super makeUntitledDocumentOfType:typeName error:outError];
-	
-	[self initializeDocument:document];
+	ZGDocument *document = [super makeUntitledDocumentOfType:typeName error:outError];
+
+	document.makeDocumentWindowController = _makeDocumentWindowController;
 	
 	return document;
 }

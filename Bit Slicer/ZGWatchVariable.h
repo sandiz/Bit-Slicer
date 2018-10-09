@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 9/14/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,6 +35,8 @@
 @class ZGInstruction;
 @class ZGRegistersState;
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface ZGWatchVariable : NSObject
 
 - (id)initWithInstruction:(ZGInstruction *)instruction registersState:(ZGRegistersState *)registersState;
@@ -48,3 +48,5 @@
 @property (nonatomic, readonly) NSUInteger accessCount;
 
 @end
+
+NS_ASSUME_NONNULL_END

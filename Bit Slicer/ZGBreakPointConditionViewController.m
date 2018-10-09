@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 1/12/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,32 +31,30 @@
  */
 
 #import "ZGBreakPointConditionViewController.h"
-
-@interface ZGBreakPointConditionViewController ()
-
-@property (nonatomic, weak) id <ZGBreakPointConditionDelegate> delegate;
-
-@property (nonatomic, assign) IBOutlet NSTextField *conditionTextField;
-
-@end
+#import "ZGNullability.h"
 
 @implementation ZGBreakPointConditionViewController
+{
+	__weak id <ZGBreakPointConditionDelegate> _Nullable _delegate;
+	
+	IBOutlet NSTextField *_conditionTextField;
+}
 
 - (id)initWithDelegate:(id <ZGBreakPointConditionDelegate>)delegate
 {
 	self = [self initWithNibName:@"Breakpoint Condition View" bundle:nil];
     if (self != nil)
 	{
-		self.delegate = delegate;
+		_delegate = delegate;
     }
     return self;
 }
 
 - (void)updateConditionDisplay
 {
-	if (self.condition != nil)
+	if (_condition != nil)
 	{
-		[self.conditionTextField setStringValue:self.condition];
+		[_conditionTextField setStringValue:(NSString * _Nonnull)_condition];
 	}
 }
 
@@ -70,18 +66,20 @@
 
 - (IBAction)changeCondition:(id)__unused sender
 {
-	[self.delegate breakPointCondition:[self.conditionTextField stringValue] didChangeAtAddress:self.targetAddress];
+	id <ZGBreakPointConditionDelegate> delegate = _delegate;
+	[delegate breakPointCondition:_conditionTextField.stringValue didChangeAtAddress:_targetAddress];
 }
 
 - (IBAction)cancel:(id)__unused sender
 {
-	[self.delegate breakPointConditionDidCancel];
+	id <ZGBreakPointConditionDelegate> delegate = _delegate;
+	[delegate breakPointConditionDidCancel];
 }
 
 #define BREAKPOINT_CONDITION_SCRIPTING @"https://github.com/zorgiepoo/Bit-Slicer/wiki/Setting-Breakpoints"
 - (IBAction)showHelp:(id)__unused sender
 {
-	[[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:BREAKPOINT_CONDITION_SCRIPTING]];
+	[[NSWorkspace sharedWorkspace] openURL:ZGUnwrapNullableObject([NSURL URLWithString:BREAKPOINT_CONDITION_SCRIPTING])];
 }
 
 @end

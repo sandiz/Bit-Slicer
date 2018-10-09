@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 12/27/12.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,15 +32,6 @@
 
 #import "ZGInstruction.h"
 #import "ZGVariable.h"
-#import "ZGUtilities.h"
-
-@interface ZGInstruction ()
-
-@property (nonatomic) int mnemonic;
-@property (nonatomic, copy) NSString *text;
-@property (nonatomic) ZGVariable *variable;
-
-@end
 
 @implementation ZGInstruction
 
@@ -51,23 +40,23 @@
 	self = [super init];
 	if (self != nil)
 	{
-		self.variable = variable;
-		self.text = text;
-		self.mnemonic = mnemonic;
+		_variable = variable;
+		_text = [text copy];
+		_mnemonic = mnemonic;
 	}
 	return self;
 }
 
 - (BOOL)isEqual:(id)object
 {
-	if (![object isKindOfClass:[ZGInstruction class]])
+	if (![(id<NSObject>)object isKindOfClass:[ZGInstruction class]])
 	{
 		return NO;
 	}
 	
 	ZGInstruction *instruction = object;
 	
-	if (self.variable.address == instruction.variable.address && (self.variable.rawValue == instruction.variable.rawValue || (self.variable.size == instruction.variable.size && memcmp(self.variable.rawValue, instruction.variable.rawValue, self.variable.size) == 0)))
+	if (_variable.address == instruction.variable.address && (_variable.rawValue == instruction.variable.rawValue || (_variable.size == instruction.variable.size && memcmp(_variable.rawValue, instruction.variable.rawValue, _variable.size) == 0)))
 	{
 		return YES;
 	}
@@ -77,7 +66,7 @@
 
 - (NSUInteger)hash
 {
-	return [[NSString stringWithFormat:@"%llu_%llu", self.variable.address, self.variable.size] hash];
+	return [[NSString stringWithFormat:@"%llu_%llu", _variable.address, _variable.size] hash];
 }
 
 @end

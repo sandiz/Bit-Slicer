@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 1/30/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,7 +43,8 @@ typedef struct
 @implementation ZGMachBinaryInfo
 {
 	uint32_t _numberOfSegments;
-	ZGMachBinarySegment *_segments;
+
+	ZGMachBinarySegment * _Nonnull _segments;
 }
 
 - (id)initWithMachHeaderAddress:(ZGMemoryAddress)machHeaderAddress segmentBytes:(const void * const)segmentBytes commandSize:(uint32_t)commandSize
@@ -58,9 +57,9 @@ typedef struct
 	
 	uint32_t maxNumberOfSegmentCommands = 0;
 	const struct load_command *loadCommand = NULL;
-	for (const void *commandBytes = segmentBytes; commandBytes < segmentBytes + commandSize; commandBytes += loadCommand->cmdsize)
+	for (const uint8_t *commandBytes = segmentBytes; commandBytes < (const uint8_t *)segmentBytes + commandSize; commandBytes += loadCommand->cmdsize)
 	{
-		loadCommand = commandBytes;
+		loadCommand = (const void *)commandBytes;
 		if (loadCommand->cmd == LC_SEGMENT_64 || loadCommand->cmd == LC_SEGMENT)
 		{
 			maxNumberOfSegmentCommands++;
@@ -73,19 +72,23 @@ typedef struct
 	}
 	
 	_segments = malloc(sizeof(*_segments) * maxNumberOfSegmentCommands);
+	if (_segments == NULL)
+	{
+		return NULL;
+	}
 	
 	loadCommand = NULL;
-	for (const void *commandBytes = segmentBytes; commandBytes < segmentBytes + commandSize; commandBytes += loadCommand->cmdsize)
+	for (const uint8_t *commandBytes = segmentBytes; commandBytes < (const uint8_t *)segmentBytes + commandSize; commandBytes += loadCommand->cmdsize)
 	{
-		loadCommand = commandBytes;
+		loadCommand = (const void *)commandBytes;
 		
 		if (loadCommand->cmd != LC_SEGMENT_64 && loadCommand->cmd != LC_SEGMENT)
 		{
 			continue;
 		}
 		
-		const struct segment_command_64 *segmentCommand64 = commandBytes;
-		const struct segment_command *segmentCommand32 = commandBytes;
+		const struct segment_command_64 *segmentCommand64 = (const void *)commandBytes;
+		const struct segment_command *segmentCommand32 = (const void *)commandBytes;
 		
 		if ((loadCommand->cmd == LC_SEGMENT_64 && segmentCommand64->vmsize == 0) || (loadCommand->cmd == LC_SEGMENT && segmentCommand32->vmsize == 0))
 		{
@@ -104,19 +107,21 @@ typedef struct
 			const void *segmentVMAddressPointer = &segmentCommand32->vmaddr;
 			
 			// struct section has enough relevant fields to make this test for 64-bit as well
-			if (sectionsOffset + sizeof(*firstSection32) <= commandBytes + loadCommand->cmdsize)
+			if ((const uint8_t *)sectionsOffset + sizeof(*firstSection32) <= commandBytes + loadCommand->cmdsize)
 			{
 				if (loadCommand->cmd == LC_SEGMENT_64)
 				{
 					// We could use firstSection64->offset instead, but this seems to catch some obfuscation cases
-					uint64_t offset = firstSection64->addr - *(uint64_t *)segmentVMAddressPointer;
+
+					uint64_t offset = firstSection64->addr - *(const uint64_t *)segmentVMAddressPointer;
 					_firstInstructionAddress = machHeaderAddress + offset;
 					_slide = machHeaderAddress + offset - firstSection64->addr;
 				}
 				else
 				{
 					// We could use firstSection32->offset instead, but this seems to catch some obfuscation cases
-					uint32_t offset = firstSection32->addr - *(uint32_t *)segmentVMAddressPointer;
+
+					uint32_t offset = firstSection32->addr - *(const uint32_t *)segmentVMAddressPointer;
 					_firstInstructionAddress = machHeaderAddress + offset;
 					_slide = machHeaderAddress + offset - firstSection32->addr;
 				}

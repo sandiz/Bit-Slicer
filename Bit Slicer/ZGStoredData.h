@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 2/2/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,11 +33,17 @@
 #import <Foundation/Foundation.h>
 #import "ZGMemoryTypes.h"
 
+NS_ASSUME_NONNULL_BEGIN
+
+@class ZGRegion;
+
 @interface ZGStoredData : NSObject
 
 + (instancetype)storedDataFromProcessTask:(ZGMemoryMap)processTask regions:(NSArray *)regions;
 + (instancetype)storedDataFromProcessTask:(ZGMemoryMap)processTask;
 
-@property (nonatomic, readonly) NSArray *regions;
+@property (nonatomic, readonly) NSArray<ZGRegion *> *regions;
 
 @end
+
+NS_ASSUME_NONNULL_END

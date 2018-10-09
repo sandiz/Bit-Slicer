@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 1/12/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,16 +34,13 @@
 #import "udis86.h"
 #import "ZGVariable.h"
 
-@interface ZGDisassemblerObject ()
-
-@property (nonatomic) ud_t *object;
-@property (nonatomic) void *bytes;
-@property (nonatomic) ZGMemoryAddress startAddress;
-@property (nonatomic) ZGMemorySize pointerSize;
-
-@end
-
 @implementation ZGDisassemblerObject
+{
+	ud_t * _Nonnull _object;
+	void * _Nonnull _bytes;
+	ZGMemoryAddress _startAddress;
+	ZGMemorySize _pointerSize;
+}
 
 // Possible candidates: UD_Isyscall, UD_Ivmcall, UD_Ivmmcall ??
 + (BOOL)isCallMnemonic:(int)mnemonic
@@ -68,12 +63,16 @@ static void disassemblerTranslator(ud_t *object)
 		// test for '0x' as a cheap way to detect if it's an immediate operand as opposed to an indirect register
 		if (strstr(originalText, "short") == NULL && strstr(originalText, "0x") != NULL)
 		{
-			NSMutableArray *textComponents = [NSMutableArray arrayWithArray:[@(originalText) componentsSeparatedByString:@" "]];
-			[textComponents insertObject:@"short" atIndex:1];
-			const char *text = [[textComponents componentsJoinedByString:@" "] UTF8String];
-			if (strlen(text)+1 <= object->asm_buf_size)
+			NSString *originalTextValue = @(originalText);
+			if (originalTextValue != nil)
 			{
-				strncpy(object->asm_buf, text, strlen(text)+1);
+				NSMutableArray<NSString *> *textComponents = [NSMutableArray arrayWithArray:[originalTextValue componentsSeparatedByString:@" "]];
+				[textComponents insertObject:@"short" atIndex:1];
+				const char *text = [[textComponents componentsJoinedByString:@" "] UTF8String];
+				if (strlen(text)+1 <= object->asm_buf_size)
+				{
+					strncpy(object->asm_buf, text, strlen(text)+1);
+				}
 			}
 		}
 	}
@@ -82,34 +81,35 @@ static void disassemblerTranslator(ud_t *object)
 - (id)initWithBytes:(const void *)bytes address:(ZGMemoryAddress)address size:(ZGMemorySize)size pointerSize:(ZGMemorySize)pointerSize
 {
 	self = [super init];
-	if (self)
+	if (self != nil)
 	{
-		self.bytes = malloc(size);
-		memcpy(self.bytes, bytes, size);
+		_bytes = malloc(size);
+		if (_bytes == NULL) return nil;
+		memcpy(_bytes, bytes, size);
 		
-		self.startAddress = address;
-		self.object = malloc(sizeof(ud_t));
+		_startAddress = address;
+		_object = malloc(sizeof(*_object));
 		
-		self.pointerSize = pointerSize;
+		_pointerSize = pointerSize;
 		
-		ud_init(self.object);
-		ud_set_input_buffer(self.object, self.bytes, size);
-		ud_set_mode(self.object, (uint8_t)self.pointerSize * 8);
-		ud_set_syntax(self.object, disassemblerTranslator);
-		ud_set_pc(self.object, self.startAddress);
+		ud_init(_object);
+		ud_set_input_buffer(_object, _bytes, size);
+		ud_set_mode(_object, (uint8_t)_pointerSize * 8);
+		ud_set_syntax(_object, disassemblerTranslator);
+		ud_set_pc(_object, _startAddress);
 	}
 	return self;
 }
 
 - (void)dealloc
 {
-	free(self.object); self.object = NULL;
-	free(self.bytes); self.bytes = NULL;
+	free(_object);
+	free(_bytes);
 }
 
-- (NSArray *)readInstructions
+- (NSArray<ZGInstruction *> *)readInstructions
 {
-	NSMutableArray *instructions = [NSMutableArray array];
+	NSMutableArray<ZGInstruction *> *instructions = [NSMutableArray array];
 	
 	while (ud_disassemble(_object) > 0)
 	{
@@ -120,7 +120,7 @@ static void disassemblerTranslator(ud_t *object)
 		
 		ZGVariable *variable =
 		[[ZGVariable alloc]
-		 initWithValue:_bytes + (instructionAddress - _startAddress)
+		 initWithValue:(uint8_t *)_bytes + (instructionAddress - _startAddress)
 		 size:instructionSize
 		 address:instructionAddress
 		 type:ZGByteArray
@@ -152,7 +152,7 @@ static void disassemblerTranslator(ud_t *object)
 			
 			ZGVariable *variable =
 			[[ZGVariable alloc]
-			 initWithValue:_bytes + (instructionAddress - _startAddress)
+			 initWithValue:(uint8_t *)_bytes + (instructionAddress - _startAddress)
 			 size:instructionSize
 			 address:instructionAddress
 			 type:ZGByteArray
@@ -211,7 +211,7 @@ static void disassemblerTranslator(ud_t *object)
 			BOOL canResolveOperand = YES;
 			if (operandType == UD_OP_JIMM)
 			{
-				branchOperandAddress = self.startAddress + ud_insn_len(_object);
+				branchOperandAddress = _startAddress + ud_insn_len(_object);
 				if (operandOffset >= 0)
 				{
 					branchOperandAddress += (uint64_t)operandOffset;
@@ -225,7 +225,7 @@ static void disassemblerTranslator(ud_t *object)
 			{
 				if (operand->base == UD_R_RIP)
 				{
-					branchOperandAddress = self.startAddress +  ud_insn_len(_object);
+					branchOperandAddress = _startAddress +  ud_insn_len(_object);
 					if (operandOffset >= 0)
 					{
 						branchOperandAddress += (uint64_t)operandOffset;
@@ -247,7 +247,7 @@ static void disassemblerTranslator(ud_t *object)
 
 			if (canResolveOperand)
 			{
-				if (self.pointerSize == sizeof(ZG32BitMemoryAddress))
+				if (_pointerSize == sizeof(ZG32BitMemoryAddress))
 				{
 					branchOperandAddress = (ZG32BitMemoryAddress)branchOperandAddress;
 				}

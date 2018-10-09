@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 2/2/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,29 +32,26 @@
 
 #import "ZGProcessTaskManager.h"
 #import "ZGVirtualMemory.h"
-#import "ZGUtilities.h"
-
-@interface ZGProcessTaskManager ()
-
-@property (nonatomic) NSMutableDictionary *tasksDictionary;
-
-@end
+#import "ZGDebugLogging.h"
 
 @implementation ZGProcessTaskManager
+{
+	NSMutableDictionary<NSNumber *, NSNumber *> * _Nullable _tasksDictionary;
+}
 
 - (BOOL)taskExistsForProcessIdentifier:(pid_t)processIdentifier
 {
-	return [self.tasksDictionary objectForKey:@(processIdentifier)] != nil;
+	return [_tasksDictionary objectForKey:@(processIdentifier)] != nil;
 }
 
 - (BOOL)getTask:(ZGMemoryMap *)processTask forProcessIdentifier:(pid_t)processIdentifier
 {
-	if (self.tasksDictionary == nil)
+	if (_tasksDictionary == nil)
 	{
-		self.tasksDictionary = [NSMutableDictionary dictionary];
+		_tasksDictionary = [NSMutableDictionary dictionary];
 	}
 	
-	NSNumber *taskNumber = [self.tasksDictionary objectForKey:@(processIdentifier)];
+	NSNumber *taskNumber = [_tasksDictionary objectForKey:@(processIdentifier)];
 	if (taskNumber != nil)
 	{
 		*processTask = [taskNumber unsignedIntValue];
@@ -76,21 +71,21 @@
 		return NO;
 	}
 	
-	[self.tasksDictionary setObject:@(*processTask) forKey:@(processIdentifier)];
+	[_tasksDictionary setObject:@(*processTask) forKey:@(processIdentifier)];
 	
 	return YES;
 }
 
 - (void)freeTaskForProcessIdentifier:(pid_t)processIdentifier
 {
-	NSNumber *taskNumber = [self.tasksDictionary objectForKey:@(processIdentifier)];
+	NSNumber *taskNumber = [_tasksDictionary objectForKey:@(processIdentifier)];
 	if (taskNumber == nil)
 	{
 		return;
 	}
 	
 	ZGDeallocatePort([taskNumber unsignedIntValue]);
-	[self.tasksDictionary removeObjectForKey:@(processIdentifier)];
+	[_tasksDictionary removeObjectForKey:@(processIdentifier)];
 }
 
 @end

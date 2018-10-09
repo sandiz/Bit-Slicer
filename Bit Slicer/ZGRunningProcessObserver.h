@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 3/14/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,11 +34,15 @@
 
 @class ZGRunningProcess;
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface ZGRunningProcessObserver : NSObject
 
-@property (strong, nonatomic) ZGRunningProcess *runningProcess;
-@property (assign, nonatomic) id observer;
+@property (nonatomic, readonly) ZGRunningProcess *runningProcess;
+@property (weak, nonatomic, readonly) id observer;
 
 - (id)initWithProcessIdentifier:(pid_t)processIdentifier observer:(id)observer;
 
 @end
+
+NS_ASSUME_NONNULL_END

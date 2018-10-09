@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 8/10/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -51,8 +49,11 @@
 #define ZGAboveValueKey @"ZGAboveValueKey"
 #define ZGBelowValueKey @"ZGBelowValueKey"
 #define ZGSearchStringValueKeyNew @"ZGSearchStringValueNewKey"
-#define ZGSearchValueComponentsOldKey @"ZGSearchValueKey" // legacy
 #define ZGSearchStringValueKeyOld @"ZGSearchStringValueKey" // legacy
+
+NS_ASSUME_NONNULL_BEGIN
+
+@class ZGVariable;
 
 @interface ZGDocumentData : NSObject
 
@@ -63,11 +64,13 @@
 @property (nonatomic) BOOL ignoreDataAlignment;
 @property (copy, nonatomic) NSString *beginningAddressStringValue;
 @property (copy, nonatomic) NSString *endingAddressStringValue;
-@property (nonatomic) NSString *searchValue;
-@property (nonatomic) NSArray *variables;
-@property (copy, nonatomic) NSString *desiredProcessInternalName;
+@property (copy, nonatomic) NSString *searchValue;
+@property (nonatomic) NSArray<ZGVariable *> *variables;
+@property (copy, nonatomic, nullable) NSString *desiredProcessInternalName;
 @property (copy, nonatomic) NSString *lastEpsilonValue;
-@property (copy, nonatomic) NSString *lastAboveRangeValue;
-@property (copy, nonatomic) NSString *lastBelowRangeValue;
+@property (copy, nonatomic, nullable) NSString *lastAboveRangeValue;
+@property (copy, nonatomic, nullable) NSString *lastBelowRangeValue;
 
 @end
+
+NS_ASSUME_NONNULL_END

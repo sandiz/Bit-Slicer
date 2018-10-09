@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 4/27/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,6 +30,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#import <Carbon/Carbon.h>
 #import <Foundation/Foundation.h>
 #import <ShortcutRecorder/SRCommon.h>
 #import "ZGHotKeyDelegate.h"
@@ -39,7 +38,9 @@
 #define INVALID_KEY_CODE -1
 #define INVALID_KEY_MODIFIER 0
 
-@interface ZGHotKey : NSObject <NSCoding>
+NS_ASSUME_NONNULL_BEGIN
+
+@interface ZGHotKey : NSObject <NSSecureCoding>
 
 + (instancetype)hotKey;
 + (instancetype)hotKeyWithKeyCombo:(KeyCombo)keyCombo;
@@ -51,6 +52,8 @@
 @property (nonatomic) EventHotKeyRef hotKeyRef;
 @property (nonatomic, weak) id <ZGHotKeyDelegate> delegate;
 @property (nonatomic) UInt32 internalID;
-@property (nonatomic) void *userData;
+@property (nonatomic, nullable) void *userData;
 
 @end
+
+NS_ASSUME_NONNULL_END

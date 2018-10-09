@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 4/6/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,21 +35,20 @@
 #import "ZGCalculator.h"
 #import "ZGMemoryTypes.h"
 #import "ZGVirtualMemory.h"
-#import "ZGUtilities.h"
+#import "ZGMemoryAddressExpressionParsing.h"
+#import "ZGRunAlertPanel.h"
+#import "ZGNullability.h"
 
 #define ZGLocalizedStringFromDumpMemoryRangeTable(string) NSLocalizedStringFromTable((string), @"[Code] Dump Memory Range", nil)
 
-@interface ZGMemoryDumpRangeWindowController ()
-
-@property (nonatomic, assign) IBOutlet NSTextField *fromAddressTextField;
-@property (nonatomic, assign) IBOutlet NSTextField *toAddressTextField;
-
-@property (nonatomic) ZGProcess *process;
-@property (nonatomic) NSWindow *parentWindow;
-
-@end
-
 @implementation ZGMemoryDumpRangeWindowController
+{
+	ZGProcess * _Nullable _process;
+	NSWindow * _Nullable _parentWindow;
+	
+	IBOutlet NSTextField *_fromAddressTextField;
+	IBOutlet NSTextField *_toAddressTextField;
+}
 
 - (NSString *)windowNibName
 {
@@ -60,46 +57,50 @@
 
 - (IBAction)dumpMemory:(id)__unused sender
 {
-	NSString *fromAddressExpression = [ZGCalculator evaluateExpression:self.fromAddressTextField.stringValue];
+	NSString *fromAddressExpression = [ZGCalculator evaluateExpression:_fromAddressTextField.stringValue];
 	ZGMemoryAddress fromAddress = ZGMemoryAddressFromExpression(fromAddressExpression);
 	
-	NSString *toAddressExpression = [ZGCalculator evaluateExpression:self.toAddressTextField.stringValue];
+	NSString *toAddressExpression = [ZGCalculator evaluateExpression:_toAddressTextField.stringValue];
 	ZGMemoryAddress toAddress = ZGMemoryAddressFromExpression(toAddressExpression);
 	
 	if (toAddress > fromAddress && fromAddressExpression.length > 0 && toAddressExpression.length > 0)
 	{
-		[NSApp endSheet:self.window];
-		[self.window close];
+		NSWindow *window = ZGUnwrapNullableObject(self.window);
+		[NSApp endSheet:window];
+		[window close];
+		
+		ZGProcess *process = ZGUnwrapNullableObject(_process);
 		
 		NSSavePanel *savePanel = NSSavePanel.savePanel;
+		savePanel.nameFieldStringValue = [process.name stringByAppendingFormat:@" 0x%llX - 0x%llX", fromAddress, toAddress];
+		
 		[savePanel
-		 beginSheetModalForWindow:self.parentWindow
-		 completionHandler:^(NSInteger result)
-		 {
-			 if (result == NSFileHandlingPanelOKButton)
-			 {
-				 BOOL success = NO;
-				 ZGMemorySize size = toAddress - fromAddress;
-				 void *bytes = NULL;
-				 
-				 if ((success = ZGReadBytes(self.process.processTask, fromAddress, &bytes, &size)))
-				 {
-					 NSData *data = [NSData dataWithBytes:bytes length:(NSUInteger)size];
-					 success = [data writeToURL:savePanel.URL atomically:NO];
-					 
-					 ZGFreeBytes(bytes, size);
-				 }
-				 else
-				 {
-					 NSLog(@"Failed to read region");
-				 }
-				 
-				 if (!success)
-				 {
-					 ZGRunAlertPanelWithOKButton(ZGLocalizedStringFromDumpMemoryRangeTable(@"failedDumpingMemoryAlertTitle"), [NSString stringWithFormat:ZGLocalizedStringFromDumpMemoryRangeTable(@"failedDumpingMemoryAlertMessageFormat"), fromAddress, toAddress]);
-				 }
-			 }
-		 }];
+		 beginSheetModalForWindow:ZGUnwrapNullableObject(_parentWindow)
+		 completionHandler:^(NSInteger result) {
+		 	if (result == NSFileHandlingPanelOKButton)
+		 	{
+		 		BOOL success = NO;
+		 		ZGMemorySize size = toAddress - fromAddress;
+		 		void *bytes = NULL;
+
+				if (ZGReadBytes(process.processTask, fromAddress, &bytes, &size))
+		 		{
+		 			NSData *data = [NSData dataWithBytes:bytes length:(NSUInteger)size];
+					success = [data writeToURL:ZGUnwrapNullableObject(savePanel.URL) atomically:YES];
+
+		 			ZGFreeBytes(bytes, size);
+		 		}
+		 		else
+		 		{
+		 			NSLog(@"Failed to read memory from %@ at 0x%llX (0x%llX bytes)", self->_process.name, fromAddress, size);
+		 		}
+
+		 		if (!success)
+		 		{
+		 			ZGRunAlertPanelWithOKButton(ZGLocalizedStringFromDumpMemoryRangeTable(@"failedDumpingMemoryAlertTitle"), [NSString stringWithFormat:ZGLocalizedStringFromDumpMemoryRangeTable(@"failedDumpingMemoryAlertMessageFormat"), fromAddress, toAddress]);
+		 		}
+		 	}
+		}];
 	}
 	else
 	{
@@ -109,26 +110,23 @@
 
 - (IBAction)cancel:(id)__unused sender
 {
-	[NSApp endSheet:self.window];
-	[self.window close];
+	NSWindow *window = ZGUnwrapNullableObject(self.window);
+	[NSApp endSheet:window];
+	[window close];
 }
 
 - (void)attachToWindow:(NSWindow *)parentWindow withProcess:(ZGProcess *)process requestedAddressRange:(HFRange)requestedAddressRange
 {
-	self.process = process;
-	self.parentWindow = parentWindow;
+	_process = process;
+	_parentWindow = parentWindow;
 	
-	[self window]; // ensure window is loaded
+	NSWindow *window = ZGUnwrapNullableObject([self window]); // ensure window is loaded
 	
-	self.fromAddressTextField.stringValue = [NSString stringWithFormat:@"0x%llX", requestedAddressRange.location];
-	self.toAddressTextField.stringValue = [NSString stringWithFormat:@"0x%llX", requestedAddressRange.location + requestedAddressRange.length];
+	_fromAddressTextField.stringValue = [NSString stringWithFormat:@"0x%llX", requestedAddressRange.location];
+	_toAddressTextField.stringValue = [NSString stringWithFormat:@"0x%llX", requestedAddressRange.location + requestedAddressRange.length];
 	
-	[NSApp
-	 beginSheet:self.window
-	 modalForWindow:self.parentWindow
-	 modalDelegate:self
-	 didEndSelector:nil
-	 contextInfo:NULL];
+	[parentWindow beginSheet:window completionHandler:^(NSModalResponse __unused returnCode) {
+	}];
 }
 
 @end

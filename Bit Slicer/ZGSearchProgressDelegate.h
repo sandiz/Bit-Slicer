@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 12/23/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,9 +34,13 @@
 
 @class ZGSearchProgress;
 
+NS_ASSUME_NONNULL_BEGIN
+
 @protocol ZGSearchProgressDelegate <NSObject>
 
 - (void)progressWillBegin:(ZGSearchProgress *)searchProgress;
 - (void)progress:(ZGSearchProgress *)searchProgress advancedWithResultSet:(NSData *)resultSet;
 
 @end
+
+NS_ASSUME_NONNULL_END

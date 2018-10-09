@@ -1,0 +1,77 @@
+/* Undo action for freezing a variable */
+"undoFreezeAction" = "Заморозка";
+
+/* Undo action for unfreezing a variable */
+"undoUnfreezeAction" = "Разморозка";
+
+/* Undo action for adding a variable */
+"undoAddVariable" = "Добавить переменную";
+
+/* Undo action for adding multiple variables */
+"undoAddVariables" = "Добавить переменные";
+
+/* Undo action for removing a variable */
+"undoRemoveVariable" = "Удалить переменную";
+
+/* Undo action for removing multiple variables */
+"undoRemoveVariables" = "Удалить переменные";
+
+/* Default description for new script */
+"defaultScriptDescription" = "Мой Скрипт";
+
+/* Undo action for nopping variables */
+"undoNOPChangeAction" = "NOP изменение";
+
+/* Alert title for NOP variable Error */
+"nopErrorAlertTitle" = "NOP Ошибка";
+
+/* Alert message error for nopping a variable */
+"nopSingleErrorAlertMessage" = "Произошла ошибка NOP'пинга инструкции.";
+
+/* Alert message error for nopping multiple variables */
+"nopMultipleErrorAlertMessage" = "Произошла ошибка NOP'пинга инструкций";
+
+/* Undo action for changing variable description */
+"undoDescriptionChange" = "Изменение описания";
+
+/* Undo action for changing variable type */
+"undoTypeChange" = "Изменение типа";
+
+/* Undo action for freezing a variable value */
+"undoFreezeValueChange" = "Изменение заморозки значения";
+
+/* Undo action for changing a variable value */
+"undoValueChange" = "Изменение значения";
+
+/* Undo action for changing Active state of a single variable */
+"undoSingleActiveChange" = "Изменение выделенной переменной";
+
+/* Undo action for changing Active state of multiple variables */
+"undoMultipleActiveChange" = "Изменение выделенных переменных";
+
+/* Undo action for editing variables */
+"undoEditVariablesChange" = "Редактирование переменных";
+
+/* Undo action for changing variable address */
+"undoAddressChange" = "Изменение адреса";
+
+/* Undo action for relativizing a single variable */
+"undoRelativizeSingleVariable" = "РевиталиRelativize Variable";
+
+/* Undo action for relativizing multiple variables */
+"undoRelativizeMultipleVariables" = "Релятивизация переменных";
+
+/* Undo action for unrelativizing a single variable */
+"undoUnrelativizeSingleVariable" = "де-Релятивизация переменной";
+
+/* Undo action for unrelativizing multiple variables */
+"undoUnrelativizeMultipleVariables" = "де-Релятивизация переменных";
+
+/* Undo action for changing variable size */
+"undoSizeChange" = "Изменение размера";
+
+/* Alert error title for changing variable size */
+"failedChangeSizeAlertTitle" = "Не удалось изменить размер";
+
+/* Alert message title for changing variable size */
+"failedChangeSizeAlertMessage" = "Размер не может быть изменен. Возможно, запрашиваемый размер слишком большой?";

@@ -1,10 +1,3 @@
-/* 
-  [Code] Search Document.strings
-  Bit Slicer
-
-  Created by Mayur Pawashe on 8/22/14.
-
-*/
 
 /* Scope Bar Protection Group */
 "scopeBarProtectionGroup" = "Protection:";
@@ -53,12 +46,6 @@
 
 /* Scope Bar accessory for Round Error label when doing = or != float/double value search; also used for error reporting */
 "searchRoundErrorLabel" = "Round Error";
-
-/* Display Value Label format for one variable; only used prior to 10.9 */
-"displayingSingleValueLabelFormat" = "Displaying _NUM_ value";
-
-/* Display Value Label format for multiple variables; only used prior to 10.9 */
-"displayingMultipleValuesLabelFormat" = "Displaying _NUM_ values";
 
 /* Equals Operator Title */
 "equalsOperatorTitle" = "equals";
@@ -138,12 +125,6 @@
 /* Alert Message that no Stored Values are available when searching with a stored value token */
 "noStoredValuesAlertMessage" = "No stored values are available to compare against. Please store values first before proceeding.";
 
-/* Label format for indicating a single value has been found during a search; only used prior to 10.9 */
-"foundSingleValueLabelFormat" = "Found _NUM_ value…";
-
-/* Label format for indicating multiple values have been found during a search; only used prior to 10.9 */
-"foundMultipleValuesLabelFormat" = "Found _NUM_ values…";
-
 /* Search Finished Notification Title */
 "searchFinishedNotificationTitle" = "Search Finished";
 
@@ -185,3 +166,12 @@
 
 /* Label for Storing all Values operation is occuring */
 "storingValuesStatusLabel" = "Storing All Values…";
+
+/* Alert Title indicating that searching is failing */
+"searchFailureAlertTitle" = "Search Failure";
+
+/* Alert Message indicating that searching is failing due to system protections */
+"searchFailureSystemProtectionAlertMessageFormat" = "%@'s memory cannot be searched due to system protections.";
+
+/* Alert Message indicating that searching is failing due to the target runnning with elevated privileges */
+"searchFailureElevatedPrivilegesAlertMessageFormat" = "%@ cannot be searched because it may be running with elevated privileges.";

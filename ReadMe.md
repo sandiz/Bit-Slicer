@@ -1,14 +1,12 @@
 # Bit Slicer
-![Bit Slicer icon](https://dl.dropbox.com/u/10108199/bit_slicer/web_icon.png)
+![Bit Slicer icon](https://zgcoder.net/software/bitslicer/images/web_icon.png)
 
-[Download Bit Slicer 1.7.4](https://bitbucket.org/zorgiepoo/bit-slicer/downloads/Bit%20Slicer%201.7.4.zip)
+[Download Bit Slicer](https://zgcoder.net/software/bitslicer/dist/stable/Bit%20Slicer.dmg)
 
 ## Introduction
-Bit Slicer is a universal game trainer for OS X, written using Cocoa and Mach kernel APIs.
+Bit Slicer is a universal game trainer for macOS, written using Cocoa and Mach kernel APIs.
 
 It allows you to cheat in video games by searching and modifying values such as your score, lives, ammunition, and much more.
-
-*Disclaimer: Use this software at your own risk. I'm not responsible for any damage that could occur.*
 
 ## Features
 * Memory Scanner
@@ -33,28 +31,26 @@ It allows you to cheat in video games by searching and modifying values such as 
 * Undo & Redo many kinds of changes, including searches
 * Evaluate mathematical expressions automatically (eg: in a flash game, search for 58 * 8)
 * Run as a normal user, not as the superuser (root)!
-* Enjoy OS level features such as auto-saving, document versioning, window restoration, notification center, app nap, etc.
-
+* Enjoy OS level features such as auto-saving, document versioning, window restoration, notification center, app nap, dark mode, etc.
 
 ## System Requirements
-* **Bit Slicer 1.7.4**: OS X 10.8 or newer
-* [Bit Slicer 1.6.2](https://bitbucket.org/zorgiepoo/bit-slicer/downloads/Bit%20Slicer%201.6.2.zip): OS X 10.6.8, a 64-bit intel Mac
-* [Bit Slicer 1.5.2](https://bitbucket.org/zorgiepoo/bit-slicer/downloads/Bit%20Slicer%201.5.2.zip): OS X 10.6.8
+* **Current Release**: macOS 10.10 or newer
+* [1.7.8](https://github.com/zorgiepoo/Bit-Slicer/releases/download/1.7.8/Bit.Slicer.dmg): macOS 10.8
+* [1.6.2](https://github.com/zorgiepoo/Bit-Slicer/releases/download/1.6.2/Bit_Slicer_1.6.2.zip): macOS 10.6.8, a 64-bit intel Mac
+* [1.5.2](https://github.com/zorgiepoo/Bit-Slicer/releases/download/1.5.2/Bit_Slicer_1.5.2.zip): macOS 10.6.8
 
-## Support & Feedback
+## Support
 * Check the [wiki](https://github.com/zorgiepoo/Bit-Slicer/wiki/) for how to use Bit Slicer
-* Report bugs or request features on the [bug tracker](https://github.com/zorgiepoo/Bit-Slicer/issues)
 * Visit the [forums](http://portingteam.com/forum/157-bit-slicer/) for discussion and current development
-* Help [translate](https://github.com/zorgiepoo/Bit-Slicer/wiki/Localization) Bit Slicer into a different language. 
-* Or send an email to zorgiepoo (at) gmail (dot) com
+* Visit the [chat room](http://webchat.freenode.net/?channels=bitslicer) for support or development (#bitslicer on irc.freenode.net). Note availability for support is not 24/7.
 
-## Source Code
-### Licensing
-Bit Slicer is licensed under the 3-clause BSD license. Versions prior to 1.6, however, are licensed under the GPL version 3 license.
+## Contributing
+* Improve the current [wiki](https://github.com/zorgiepoo/Bit-Slicer/wiki/) by fixing errors or by adding content
+* Report bugs or request features on the [issue tracker](https://github.com/zorgiepoo/Bit-Slicer/issues)
+* Help [translate](https://github.com/zorgiepoo/Bit-Slicer/wiki/Localization) Bit Slicer into a different language
+* Help [design improved artwork](https://github.com/zorgiepoo/Bit-Slicer/issues/18)
+* Learn how to build and contribute to the [source code](https://github.com/zorgiepoo/Bit-Slicer/wiki/Source-Code)
 
-### Code Signing
-In order to build Bit Slicer, code signing is required to gain sufficient privilleges to using *task_for_pid()*. Building with the Debug scheme uses a self-signed certificate (which only works locally) and building with the Release scheme uses my purchased Developer ID certificate (which works for distribution).
+Please read this project's [Code Of Conduct](https://github.com/zorgiepoo/Bit-Slicer/blob/master/CODE_OF_CONDUCT.md) residing in the root level of the project.
 
-In order to build Bit Slicer in Debug mode using a self-signed certificate, please follow [these instructions](https://bitbucket.org/zorgiepoo/bit-slicer/wiki/Code%20Signing). Note that this involves more steps than code-signing typical applications.
-
-Versions prior to 1.6 are not code-signed, and consequently, the user is required to authorize the application to run as the superuser.
+**Update**: This project may need some help! I cannot guarantee my activeness in reviewing / pulling in future changes, as well as pushing out new releases.

@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 4/27/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -44,7 +42,7 @@
 
 + (instancetype)hotKeyWithKeyCombo:(KeyCombo)keyCombo
 {
-	return [[self alloc] initWithKeyCombo:keyCombo];
+	return [(ZGHotKey *)[self alloc] initWithKeyCombo:keyCombo];
 }
 
 + (instancetype)hotKey
@@ -74,6 +72,11 @@
 {
 	[encoder encodeInteger:_keyCombo.code forKey:ZGHotKeyComboCode];
 	[encoder encodeInteger:(NSInteger)_keyCombo.flags forKey:ZGHotKeyComboFlags];
+}
+
++ (BOOL)supportsSecureCoding
+{
+	return YES;
 }
 
 - (BOOL)valid

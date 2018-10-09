@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 12/31/12.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,20 +32,24 @@
 
 #import <Foundation/Foundation.h>
 
-@interface NSArray (NSArrayAdditions)
+NS_ASSUME_NONNULL_BEGIN
 
-typedef BOOL (^zg_array_filter_t)(id __unsafe_unretained item);
+@interface NSArray<ObjectType> (NSArrayAdditions)
 
-typedef NSComparisonResult (^zg_binary_search_t)(id __unsafe_unretained currentObject);
-typedef id (^zg_map_t)(id __unsafe_unretained oldObject);
+typedef BOOL (^zg_array_filter_t)(ObjectType __unsafe_unretained object);
 
-- (NSArray *)zgFilterUsingBlock:(zg_array_filter_t)shouldKeep;
+typedef NSComparisonResult (^zg_binary_search_t)(ObjectType __unsafe_unretained currentObject);
+typedef id _Nonnull (^zg_map_t)(ObjectType __unsafe_unretained object);
+
+- (NSArray<ObjectType> *)zgFilterUsingBlock:(zg_array_filter_t)shouldKeep;
 - (NSArray *)zgMapUsingBlock:(zg_map_t)map;
 
-- (id)zgFirstObjectThatMatchesCondition:(zg_array_filter_t)matchingCondition;
+- (nullable ObjectType)zgFirstObjectThatMatchesCondition:(zg_array_filter_t)matchingCondition;
 - (BOOL)zgHasObjectMatchingCondition:(zg_array_filter_t)matchingCondition;
 - (BOOL)zgAllObjectsMatchingCondition:(zg_array_filter_t)matchingCondition;
 
-- (id)zgBinarySearchUsingBlock:(zg_binary_search_t)comparator;
+- (nullable ObjectType)zgBinarySearchUsingBlock:(zg_binary_search_t)comparator;
 
 @end
+
+NS_ASSUME_NONNULL_END

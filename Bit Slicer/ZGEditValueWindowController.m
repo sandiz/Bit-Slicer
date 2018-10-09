@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 11/28/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,28 +36,26 @@
 #import "ZGVariable.h"
 #import "ZGProcess.h"
 #import "ZGVirtualMemory.h"
-#import "ZGUtilities.h"
+#import "ZGRunAlertPanel.h"
+#import "ZGNullability.h"
 
 #define ZGEditValueLocalizableTable @"[Code] Edit Variable Value"
 
-@interface ZGEditValueWindowController ()
-
-@property (nonatomic, assign) IBOutlet NSTextField *valueTextField;
-@property (nonatomic, assign) ZGVariableController *variableController;
-
-@property (nonatomic) NSArray *variablesToEdit;
-@property (nonatomic) ZGMemoryMap processTask;
-
-@end
-
 @implementation ZGEditValueWindowController
+{
+	ZGVariableController * _Nonnull _variableController;
+	NSArray<ZGVariable *> * _Nullable _variablesToEdit;
+	ZGMemoryMap _processTask;
+	
+	IBOutlet NSTextField *_valueTextField;
+}
 
 - (id)initWithVariableController:(ZGVariableController *)variableController
 {
 	self = [super init];
 	if (self != nil)
 	{
-		self.variableController = variableController;
+		_variableController = variableController;
 	}
 	return self;
 }
@@ -69,7 +65,7 @@
 	return @"Edit Value Dialog";
 }
 
-- (NSString *)commonByteArrayPatternFromVariables:(NSArray *)variables
+- (NSString *)commonByteArrayPatternFromVariables:(NSArray<ZGVariable *> *)variables
 {
 	ZGVariable *shortestVariable = nil;
 	for (ZGVariable *variable in variables)
@@ -80,12 +76,12 @@
 		}
 	}
 	
-	NSMutableArray *commonComponents = [NSMutableArray arrayWithArray:[shortestVariable.stringValue componentsSeparatedByString:@" "]];
+	NSMutableArray<NSString *> *commonComponents = [NSMutableArray arrayWithArray:[shortestVariable.stringValue componentsSeparatedByString:@" "]];
 	for (ZGVariable *variable in variables)
 	{
 		if (shortestVariable == variable) continue;
 		
-		NSArray *components = [variable.stringValue componentsSeparatedByString:@" "];
+		NSArray<NSString *> *components = [variable.stringValue componentsSeparatedByString:@" "];
 		for (NSUInteger componentIndex = 0; componentIndex < commonComponents.count; componentIndex++)
 		{
 			NSString *commonComponent = [commonComponents objectAtIndex:componentIndex];
@@ -119,7 +115,7 @@
 	return [commonComponents componentsJoinedByString:@" "];
 }
 
-- (void)requestEditingValuesFromVariables:(NSArray *)variables withProcessTask:(ZGMemoryMap)processTask attachedToWindow:(NSWindow *)parentWindow scriptManager:(ZGScriptManager *)scriptManager
+- (void)requestEditingValuesFromVariables:(NSArray<ZGVariable *> *)variables withProcessTask:(ZGMemoryMap)processTask attachedToWindow:(NSWindow *)parentWindow scriptManager:(ZGScriptManager *)scriptManager
 {
 	ZGVariable *firstNonScriptVariable = nil;
 	BOOL isAllByteArrays = YES;
@@ -142,38 +138,35 @@
 	
 	if (firstNonScriptVariable == nil) return;
 	
-	[self window]; // ensure window is loaded
+	NSWindow *window = ZGUnwrapNullableObject([self window]); // ensure window is loaded
 	
 	if (!isAllByteArrays)
 	{
-		self.valueTextField.stringValue = firstNonScriptVariable.stringValue;
+		_valueTextField.stringValue = firstNonScriptVariable.stringValue;
 	}
 	else
 	{
-		self.valueTextField.stringValue = [self commonByteArrayPatternFromVariables:variables];
+		_valueTextField.stringValue = [self commonByteArrayPatternFromVariables:variables];
 	}
 	
-	[self.valueTextField selectText:nil];
+	[_valueTextField selectText:nil];
 	
-	self.variablesToEdit = variables;
-	self.processTask = processTask;
+	_variablesToEdit = variables;
+	_processTask = processTask;
 	
-	[NSApp
-	 beginSheet:self.window
-	 modalForWindow:parentWindow
-	 modalDelegate:self
-	 didEndSelector:nil
-	 contextInfo:NULL];
+	[parentWindow beginSheet:window completionHandler:^(NSModalResponse __unused returnCode) {
+	}];
 }
 
 - (IBAction)editValues:(id)__unused sender
 {
-	[NSApp endSheet:self.window];
-	[self.window close];
+	NSWindow *window = ZGUnwrapNullableObject(self.window);
+	[NSApp endSheet:window];
+	[window close];
 	
-	NSMutableArray *validVariables = [[NSMutableArray alloc] init];
+	NSMutableArray<ZGVariable *> *validVariables = [[NSMutableArray alloc] init];
 	
-	for (ZGVariable *variable in self.variablesToEdit)
+	for (ZGVariable *variable in _variablesToEdit)
 	{
 		if (variable.type == ZGScript) continue;
 		
@@ -181,7 +174,7 @@
 		ZGMemoryAddress memoryAddress = variable.address;
 		ZGMemorySize memorySize = variable.size;
 		
-		if (!ZGMemoryProtectionInRegion(self.processTask, &memoryAddress, &memorySize, &memoryProtection)) continue;
+		if (!ZGMemoryProtectionInRegion(_processTask, &memoryAddress, &memorySize, &memoryProtection)) continue;
 		
 		if (variable.address >= memoryAddress && variable.address + variable.size <= memoryAddress + memorySize)
 		{
@@ -189,7 +182,7 @@
 		}
 	}
 	
-	self.variablesToEdit = nil;
+	_variablesToEdit = nil;
 	
 	if (validVariables.count == 0)
 	{
@@ -197,22 +190,23 @@
 		return;
 	}
 	
-	NSMutableArray *newValues = [[NSMutableArray alloc] init];
-	NSString *replaceString = self.valueTextField.stringValue;
+	NSMutableArray<NSString *> *newValues = [[NSMutableArray alloc] init];
+	NSString *replaceString = _valueTextField.stringValue;
 	
 	for (NSUInteger index = 0; index < validVariables.count; index++)
 	{
 		[newValues addObject:replaceString];
 	}
 	
-	[self.variableController editVariables:validVariables newValues:newValues];
+	[_variableController editVariables:validVariables newValues:newValues];
 }
 
 - (IBAction)cancelEditingValues:(id)__unused sender
 {
-	[NSApp endSheet:self.window];
-	[self.window close];
-	self.variablesToEdit = nil;
+	NSWindow *window = ZGUnwrapNullableObject(self.window);
+	[NSApp endSheet:window];
+	[window close];
+	_variablesToEdit = nil;
 }
 
 @end

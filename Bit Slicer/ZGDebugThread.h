@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 12/29/12.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,11 +32,16 @@
 
 #import <Foundation/Foundation.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface ZGDebugThread : NSObject
 
-- (id)initWithThread:(thread_act_t)thread registerIndex:(int)registerIndex;
+// registerIndex should only be within [0, 4)
+- (id)initWithThread:(thread_act_t)thread registerIndex:(uint8_t)registerIndex;
 
 @property (readonly, nonatomic) thread_act_t thread;
-@property (readonly, nonatomic) int registerIndex;
+@property (readonly, nonatomic) uint8_t registerIndex;
 
 @end
+
+NS_ASSUME_NONNULL_END

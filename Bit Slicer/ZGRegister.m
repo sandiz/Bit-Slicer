@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 1/16/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,48 +33,38 @@
 #import "ZGRegister.h"
 #import "ZGVariable.h"
 
-@interface ZGRegister ()
-
-@property (nonatomic) void *rawValue;
-
-@property (nonatomic, assign) ZGMemorySize size;
-@property (nonatomic, assign) ZGMemorySize internalSize;
-@property (nonatomic, assign) ZGRegisterType registerType;
-
-@end
-
 @implementation ZGRegister
+{
+	ZGMemorySize _internalSize;
+}
 
-- (id)initWithRegisterType:(ZGRegisterType)registerType variable:(ZGVariable *)variable pointerSize:(ZGMemorySize)pointerSize
+- (id)initWithRegisterType:(ZGRegisterType)registerType variable:(ZGVariable *)variable
 {
 	self = [super init];
-	if (self)
+	if (self != nil)
 	{
-		self.registerType = registerType;
-		self.size = variable.size;
-		// If variable's type is changed, ensure there is enough space for pointer size
-		self.internalSize = MAX(pointerSize, self.size);
-		self.variable = variable;
+		_registerType = registerType;
+		_size = variable.size;
+		// If variable's type is changed, ensure there is enough space for pointer size, double, 64-bit integers, etc
+		_internalSize = MAX(sizeof(int64_t), MAX(sizeof(double), MAX(sizeof(ZGMemorySize), _size)));
+		[self setVariable:variable];
 	}
 	return self;
 }
 
 - (void)dealloc
 {
-	self.variable = nil;
+	free(_rawValue);
 }
 
 - (void)setVariable:(ZGVariable *)variable
 {
 	_variable = variable;
 	
-	free(self.rawValue);
-	
-	if (_variable != nil)
-	{
-		self.rawValue = calloc(1, self.internalSize);
-		memcpy(self.rawValue, _variable.rawValue, self.size);
-	}
+	free(_rawValue);
+	_rawValue = calloc(1, _internalSize);
+	assert(_rawValue != NULL);
+	memcpy(_rawValue, _variable.rawValue, _size);
 }
 
 @end

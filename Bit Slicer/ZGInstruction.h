@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 12/27/12.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,13 +35,17 @@
 
 @class ZGVariable;
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface ZGInstruction : NSObject
 
-- (id)initWithVariable:(ZGVariable *)variable text:(NSString *)text mnemonic:(int)mnemonic;
+- (nonnull id)initWithVariable:(ZGVariable *)variable text:(NSString *)text mnemonic:(int)mnemonic;
 
 @property (nonatomic, readonly, copy) NSString *text;
 @property (nonatomic, readonly) int mnemonic;
 @property (nonatomic, readonly) ZGVariable *variable;
-@property (nonatomic, copy) NSString *symbols;
+@property (nonatomic, copy, nullable) NSString *symbols;
 
 @end
+
+NS_ASSUME_NONNULL_END

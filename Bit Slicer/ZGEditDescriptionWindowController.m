@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 12/29/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,16 +32,15 @@
 
 #import "ZGEditDescriptionWindowController.h"
 #import "ZGVariableController.h"
-
-@interface ZGEditDescriptionWindowController ()
-
-@property (nonatomic) ZGVariableController *variableController;
-@property (nonatomic) ZGVariable *variable;
-@property (nonatomic, assign) IBOutlet NSTextView *descriptionTextView;
-
-@end
+#import "ZGNullability.h"
 
 @implementation ZGEditDescriptionWindowController
+{
+	ZGVariableController * _Nonnull _variableController;
+	ZGVariable * _Nullable _variable;
+	
+	IBOutlet NSTextView *_descriptionTextView;
+}
 
 - (NSString *)windowNibName
 {
@@ -55,38 +52,41 @@
 	self = [super init];
 	if (self != nil)
 	{
-		self.variableController = variableController;
+		_variableController = variableController;
 	}
 	return self;
 }
 
 - (void)requestEditingDescriptionFromVariable:(ZGVariable *)variable attachedToWindow:(NSWindow *)parentWindow
 {
-	[self window]; // ensure window is loaded
+	NSWindow *window = ZGUnwrapNullableObject([self window]); // ensure window is loaded
 	
-	[self.descriptionTextView.textStorage setAttributedString:variable.fullAttributedDescription];
-	[self.descriptionTextView scrollRangeToVisible:NSMakeRange(0, 0)];
-	self.variable = variable;
+	[_descriptionTextView.textStorage setAttributedString:variable.fullAttributedDescription];
+	[_descriptionTextView scrollRangeToVisible:NSMakeRange(0, 0)];
+	_variable = variable;
 	
-	[NSApp
-	 beginSheet:self.window
-	 modalForWindow:parentWindow
-	 modalDelegate:self
-	 didEndSelector:nil
-	 contextInfo:NULL];
+	[parentWindow beginSheet:window completionHandler:^(NSModalResponse __unused returnCode) {
+	}];
 }
 
 - (IBAction)editVariableDescription:(id)__unused sender
 {
-	[self.variableController changeVariable:self.variable newDescription:[self.descriptionTextView.textStorage copy]];
-	[NSApp endSheet:self.window];
-	[self.window close];
+	NSAttributedString *newDescription = [_descriptionTextView.textStorage copy];
+	if (newDescription != nil)
+	{
+		[_variableController changeVariable:ZGUnwrapNullableObject(_variable) newDescription:newDescription];
+		
+		NSWindow *window = ZGUnwrapNullableObject([self window]);
+		[NSApp endSheet:window];
+		[window close];
+	}
 }
 
 - (IBAction)cancelEditingVariableDescription:(id)__unused sender
 {
-	[NSApp endSheet:self.window];
-	[self.window close];
+	NSWindow *window = ZGUnwrapNullableObject([self window]);
+	[NSApp endSheet:window];
+	[window close];
 }
 
 // Make this controller the only one that can use the font and color panels, since nobody else needs it

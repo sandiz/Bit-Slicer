@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 3/11/10.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,8 +36,12 @@
 @class ZGAppUpdaterController;
 @class ZGDebuggerController;
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface ZGPreferencesController : NSWindowController
 
 - (id)initWithHotKeyCenter:(ZGHotKeyCenter *)hotKeyCenter debuggerController:(ZGDebuggerController *)debuggerController appUpdaterController:(ZGAppUpdaterController *)appUpdaterController;
 
 @end
+
+NS_ASSUME_NONNULL_END

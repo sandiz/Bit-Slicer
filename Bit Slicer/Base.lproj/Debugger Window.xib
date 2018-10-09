@@ -1,23 +1,24 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="6250" systemVersion="14A389" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none">
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="11762" systemVersion="16D32" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none">
     <dependencies>
         <deployment identifier="macosx"/>
-        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="6250"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="11762"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <objects>
         <customObject id="-2" userLabel="File's Owner" customClass="ZGDebuggerController">
             <connections>
+                <outlet property="_backtraceView" destination="Bh5-To-vJR" id="bfA-EE-S8E"/>
+                <outlet property="_continueButton" destination="2Xc-JX-DhY" id="T5D-6i-GbH"/>
+                <outlet property="_instructionsTableView" destination="Ksp-7e-9HA" id="G3L-dK-8yp"/>
+                <outlet property="_registersAndBacktraceSplitView" destination="246" id="Rfr-5R-8ne"/>
+                <outlet property="_registersView" destination="YKc-8G-cFS" id="Gvf-Mf-9Er"/>
+                <outlet property="_splitView" destination="239" id="mm1-lA-4RG"/>
+                <outlet property="_statusTextField" destination="QFr-ST-Ct0" id="KWB-Po-Ehn"/>
+                <outlet property="_stepExecutionSegmentedControl" destination="hed-Ji-GwK" id="Zj5-rL-JHM"/>
                 <outlet property="addressTextField" destination="ztk-ei-XwG" id="HE9-HV-rHU"/>
-                <outlet property="backtraceView" destination="Bh5-To-vJR" id="7wn-JW-2kV"/>
-                <outlet property="continueButton" destination="2Xc-JX-DhY" id="dr8-aT-zNo"/>
-                <outlet property="instructionsTableView" destination="Ksp-7e-9HA" id="xuY-up-g0Y"/>
                 <outlet property="navigationSegmentedControl" destination="vkH-Yd-fy0" id="Ky9-Xf-TmK"/>
-                <outlet property="registersAndBacktraceSplitView" destination="246" id="FXl-Gz-Yfd"/>
-                <outlet property="registersView" destination="YKc-8G-cFS" id="00F-gy-zwL"/>
                 <outlet property="runningApplicationsPopUpButton" destination="fpR-fU-ajG" id="98g-ZN-oRL"/>
-                <outlet property="splitView" destination="239" id="247"/>
-                <outlet property="statusTextField" destination="QFr-ST-Ct0" id="t5w-EZ-lIx"/>
-                <outlet property="stepExecutionSegmentedControl" destination="hed-Ji-GwK" id="6XI-Fz-1zt"/>
                 <outlet property="window" destination="5" id="37"/>
             </connections>
         </customObject>
@@ -78,7 +79,7 @@
                 </menuItem>
             </items>
         </menu>
-        <window title="Debugger" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" oneShot="NO" releasedWhenClosed="NO" visibleAtLaunch="NO" frameAutosaveName="ZGDebuggerWindow" animationBehavior="default" id="5" userLabel="Window - Debugger">
+        <window title="Debugger" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" oneShot="NO" releasedWhenClosed="NO" visibleAtLaunch="NO" frameAutosaveName="ZGDebuggerWindow" animationBehavior="default" tabbingMode="disallowed" id="5" userLabel="Window - Debugger">
             <windowStyleMask key="styleMask" titled="YES" closable="YES" miniaturizable="YES" resizable="YES"/>
             <windowCollectionBehavior key="collectionBehavior" fullScreenPrimary="YES"/>
             <windowPositionMask key="initialPositionMask" leftStrut="YES" rightStrut="YES" topStrut="YES" bottomStrut="YES"/>
@@ -97,14 +98,14 @@
                                 <rect key="frame" x="0.0" y="0.0" width="840" height="285"/>
                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                 <clipView key="contentView" focusRingType="none" id="QCs-yF-iGW">
-                                    <rect key="frame" x="0.0" y="17" width="840" height="268"/>
+                                    <rect key="frame" x="0.0" y="0.0" width="840" height="285"/>
                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                     <subviews>
                                         <tableView focusRingType="none" verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" alternatingRowBackgroundColors="YES" columnReordering="NO" columnSelection="YES" autosaveColumns="NO" headerView="tpt-Jt-lnH" id="Ksp-7e-9HA" customClass="ZGTableView">
-                                            <rect key="frame" x="0.0" y="0.0" width="840" height="19"/>
+                                            <rect key="frame" x="0.0" y="0.0" width="840" height="268"/>
                                             <autoresizingMask key="autoresizingMask"/>
                                             <size key="intercellSpacing" width="3" height="2"/>
-                                            <color key="backgroundColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                                            <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
                                             <color key="gridColor" name="gridColor" catalog="System" colorSpace="catalog"/>
                                             <tableColumns>
                                                 <tableColumn identifier="breakpoint" width="50" minWidth="20" maxWidth="100" id="pCd-L4-hx2">
@@ -179,7 +180,6 @@
                                             </connections>
                                         </tableView>
                                     </subviews>
-                                    <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
                                 </clipView>
                                 <scroller key="horizontalScroller" hidden="YES" verticalHuggingPriority="750" horizontal="YES" id="Uyj-zZ-YCW">
                                     <rect key="frame" x="0.0" y="269" width="840" height="16"/>
@@ -259,7 +259,7 @@
                     <toolbarItem implicitItemIdentifier="FDC43EA3-3666-4087-AFD1-D12E844C7CC3" label="Target" paletteLabel="Target" id="V6x-9g-MBo">
                         <nil key="toolTip"/>
                         <size key="minSize" width="81" height="25"/>
-                        <size key="maxSize" width="195" height="25"/>
+                        <size key="maxSize" width="195" height="27"/>
                         <popUpButton key="view" verticalHuggingPriority="750" id="fpR-fU-ajG">
                             <rect key="frame" x="0.0" y="14" width="145" height="25"/>
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
@@ -276,9 +276,9 @@
                     <toolbarItem implicitItemIdentifier="1A9DCB4E-799C-4634-B1F6-CB15382E7DF9" label="Continue" paletteLabel="Continue" image="continue" id="KQE-fj-qqG">
                         <nil key="toolTip"/>
                         <size key="minSize" width="39" height="25"/>
-                        <size key="maxSize" width="39" height="25"/>
+                        <size key="maxSize" width="41" height="27"/>
                         <button key="view" verticalHuggingPriority="750" id="2Xc-JX-DhY">
-                            <rect key="frame" x="9" y="14" width="39" height="25"/>
+                            <rect key="frame" x="8" y="14" width="39" height="25"/>
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                             <buttonCell key="cell" type="roundTextured" bezelStyle="texturedRounded" image="continue" imagePosition="only" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="pHW-hV-Whn">
                                 <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>

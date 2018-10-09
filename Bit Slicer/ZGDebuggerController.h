@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 12/27/12.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,25 +38,33 @@
 #import "ZGBreakPointConditionViewController.h"
 #import "ZGBacktraceViewController.h"
 #import "ZGHotKeyDelegate.h"
+#import "ZGRegistersViewController.h"
+#import "ZGMemorySelectionDelegate.h"
 
 @class ZGProcess;
 @class ZGInstruction;
+@class ZGBreakPoint;
 @class ZGMachBinary;
 @class ZGProcessTaskManager;
 @class ZGBreakPointController;
+@class ZGScriptingInterpreter;
 @class ZGHotKeyCenter;
 @class ZGLoggerWindowController;
+
+NS_ASSUME_NONNULL_BEGIN
 
 extern NSString *ZGPauseAndUnpauseHotKey;
 extern NSString *ZGStepInHotKey;
 extern NSString *ZGStepOverHotKey;
 extern NSString *ZGStepOutHotKey;
 
-@interface ZGDebuggerController : ZGMemoryNavigationWindowController <NSTableViewDataSource, ZGBreakPointDelegate, ZGBreakPointConditionDelegate, ZGBacktraceViewControllerDelegate, ZGHotKeyDelegate>
+@interface ZGDebuggerController : ZGMemoryNavigationWindowController <NSTableViewDataSource, ZGBreakPointDelegate, ZGBreakPointConditionDelegate, ZGBacktraceViewControllerDelegate, ZGHotKeyDelegate, ZGRegistersViewDelegate>
 
-- (id)initWithProcessTaskManager:(ZGProcessTaskManager *)processTaskManager breakPointController:(ZGBreakPointController *)breakPointController hotKeyCenter:(ZGHotKeyCenter *)hotKeyCenter loggerWindowController:(ZGLoggerWindowController *)loggerWindowController;
+- (id)initWithProcessTaskManager:(ZGProcessTaskManager *)processTaskManager rootlessConfiguration:(nullable ZGRootlessConfiguration *)rootlessConfiguration breakPointController:(nonnull ZGBreakPointController *)breakPointController scriptingInterpreter:(ZGScriptingInterpreter *)scriptingInterpreter hotKeyCenter:(ZGHotKeyCenter *)hotKeyCenter loggerWindowController:(ZGLoggerWindowController *)loggerWindowController delegate:(nullable id <ZGChosenProcessDelegate, ZGMemorySelectionDelegate, ZGShowMemoryWindow>)delegate;
 
 - (void)cleanup;
+
+@property (nonatomic, readonly) NSMutableArray<ZGBreakPoint *> *haltedBreakPoints;
 
 @property (nonatomic, readonly) ZGHotKey *pauseAndUnpauseHotKey;
 @property (nonatomic, readonly) ZGHotKey *stepInHotKey;
@@ -69,8 +75,10 @@ extern NSString *ZGStepOutHotKey;
 
 - (BOOL)isProcessIdentifierHalted:(pid_t)processIdentifier;
 
-- (NSArray *)selectedInstructions;
+- (nonnull NSArray<ZGInstruction *> *)selectedInstructions;
 
 - (void)jumpToMemoryAddress:(ZGMemoryAddress)address inProcess:(ZGProcess *)requestedProcess;
 
 @end
+
+NS_ASSUME_NONNULL_END

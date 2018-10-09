@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 11/28/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,13 +33,18 @@
 #import <Cocoa/Cocoa.h>
 #import "ZGMemoryTypes.h"
 
+@class ZGVariable;
 @class ZGVariableController;
 @class ZGScriptManager;
+
+NS_ASSUME_NONNULL_BEGIN
 
 @interface ZGEditValueWindowController : NSWindowController
 
 - (id)initWithVariableController:(ZGVariableController *)variableController;
 
-- (void)requestEditingValuesFromVariables:(NSArray *)variables withProcessTask:(ZGMemoryMap)processTask attachedToWindow:(NSWindow *)parentWindow scriptManager:(ZGScriptManager *)scriptManager;
+- (void)requestEditingValuesFromVariables:(NSArray<ZGVariable *> *)variables withProcessTask:(ZGMemoryMap)processTask attachedToWindow:(NSWindow *)parentWindow scriptManager:(ZGScriptManager *)scriptManager;
 
 @end
+
+NS_ASSUME_NONNULL_END

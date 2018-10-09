@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 10/28/09.
- *
- * Copyright (c) 2012 zgcoder
+ * Copyright (c) 2012 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,24 +33,20 @@
 #import "ZGProcess.h"
 #import "ZGMachBinary.h"
 #import "ZGVirtualMemory.h"
-#import "ZGProcessTaskManager.h"
 #import "ZGMachBinary.h"
 #import "ZGMachBinaryInfo.h"
-#import "CoreSymbolication.h"
-
-@interface ZGProcess ()
-{
-	NSMutableDictionary *_cacheDictionary;
-}
-
-@property (nonatomic) ZGMachBinary *mainMachBinary;
-@property (nonatomic) ZGMachBinary *dylinkerBinary;
-
-@property (nonatomic) CSSymbolicatorRef symbolicator;
-
-@end
+#import "ZGPrivateCoreSymbolicator.h"
 
 @implementation ZGProcess
+{
+	NSMutableDictionary<NSString *, NSMutableDictionary *> * _Nullable _cacheDictionary;
+	
+	ZGMachBinary * _Nullable _mainMachBinary;
+	ZGMachBinary * _Nullable _dylinkerBinary;
+	
+	id <ZGSymbolicator> _Nullable _symbolicator;
+	BOOL _failedCreatingSymbolicator;
+}
 
 - (instancetype)initWithName:(NSString *)processName internalName:(NSString *)internalName processID:(pid_t)aProcessID is64Bit:(BOOL)flag64Bit
 {
@@ -99,108 +93,48 @@
 
 - (void)dealloc
 {
-	if (self.valid && !CSIsNull(self.symbolicator))
+	if ([self valid] && _symbolicator != nil)
 	{
-		CSRelease(self.symbolicator);
+		[_symbolicator invalidate];
 	}
 }
 
 - (BOOL)isEqual:(id)process
 {
-	return ([process processID] == self.processID);
+	return ([(ZGProcess *)process processID] == _processID);
 }
 
 - (NSUInteger)hash
 {
-	return (NSUInteger)self.processID;
+	return (NSUInteger)_processID;
 }
 
 - (BOOL)valid
 {
-	return self.processID != NON_EXISTENT_PID_NUMBER;
+	return _processID != NON_EXISTENT_PID_NUMBER;
 }
 
-- (CSSymbolicatorRef)symbolicator
+- (id <ZGSymbolicator>)symbolicator
 {
-	if (self.valid && CSIsNull(_symbolicator))
+	if ([self valid] && _symbolicator == nil && !_failedCreatingSymbolicator)
 	{
-		_symbolicator = CSSymbolicatorCreateWithTask(self.processTask);
+		_symbolicator = [[ZGPrivateCoreSymbolicator alloc] initWithTask:_processTask];
+		// Creating the symbolicator can be very costly; make sure we don't try creating one often if it keeps failing
+		if (_symbolicator == nil)
+		{
+			_failedCreatingSymbolicator = YES;
+		}
 	}
 	return _symbolicator;
 }
 
-- (NSString *)symbolAtAddress:(ZGMemoryAddress)address relativeOffset:(ZGMemoryAddress *)relativeOffset
-{
-	NSString *symbolName = nil;
-	CSSymbolicatorRef symbolicator = self.symbolicator;
-	if (!CSIsNull(symbolicator))
-	{
-		CSSymbolRef symbol = CSSymbolicatorGetSymbolWithAddressAtTime(symbolicator, address, kCSNow);
-		if (!CSIsNull(symbol))
-		{
-			const char *symbolNameCString = CSSymbolGetName(symbol);
-			if (symbolNameCString != NULL)
-			{
-				symbolName = @(symbolNameCString);
-			}
-
-			if (relativeOffset != NULL)
-			{
-				CSRange symbolRange = CSSymbolGetRange(symbol);
-				*relativeOffset = address - symbolRange.location;
-			}
-		}
-	}
-
-	return symbolName;
-}
-
-- (NSNumber *)findSymbol:(NSString *)symbolName withPartialSymbolOwnerName:(NSString *)partialSymbolOwnerName requiringExactMatch:(BOOL)requiresExactMatch pastAddress:(ZGMemoryAddress)pastAddress
-{
-	__block CSSymbolRef resultSymbol = kCSNull;
-	__block BOOL foundDesiredSymbol = NO;
-
-	CSSymbolicatorRef symbolicator = self.symbolicator;
-	if (CSIsNull(symbolicator)) return nil;
-
-	const char *symbolCString = [symbolName UTF8String];
-
-	CSSymbolicatorForeachSymbolOwnerAtTime(symbolicator, kCSNow, ^(CSSymbolOwnerRef owner) {
-		if (!foundDesiredSymbol)
-		{
-			const char *symbolOwnerName = CSSymbolOwnerGetName(owner); // this really returns a suffix
-			if (partialSymbolOwnerName == nil || (symbolOwnerName != NULL && [partialSymbolOwnerName hasSuffix:@(symbolOwnerName)]))
-			{
-				CSSymbolOwnerForeachSymbol(owner, ^(CSSymbolRef symbol) {
-					if (!foundDesiredSymbol)
-					{
-						const char *symbolFound = CSSymbolGetName(symbol);
-						if (symbolFound != NULL && ((requiresExactMatch && strcmp(symbolCString, symbolFound) == 0) || (!requiresExactMatch && strstr(symbolFound, symbolCString) != NULL)))
-						{
-							CSRange symbolRange = CSSymbolGetRange(symbol);
-							if (pastAddress < symbolRange.location)
-							{
-								foundDesiredSymbol = YES;
-							}
-
-							resultSymbol = symbol;
-						}
-					}
-				});
-			}
-		}
-	});
-
-	return CSIsNull(resultSymbol) ? nil : @(CSSymbolGetRange(resultSymbol).location);
-}
-
-- (NSMutableDictionary *)cacheDictionary
+- (NSMutableDictionary<NSString *, NSMutableDictionary *> *)cacheDictionary
 {
 	if (_cacheDictionary == nil)
 	{
 		_cacheDictionary = [[NSMutableDictionary alloc] initWithDictionary:@{ZGMachBinaryPathToBinaryInfoDictionary : [NSMutableDictionary dictionary], ZGMachBinaryPathToBinaryDictionary : [NSMutableDictionary dictionary]}];
 	}
-	return _cacheDictionary;
+	return (id _Nonnull)_cacheDictionary;
 }
 
 - (ZGMachBinary *)dylinkerBinary
@@ -223,12 +157,12 @@
 
 - (BOOL)hasGrantedAccess
 {
-    return MACH_PORT_VALID(self.processTask);
+    return MACH_PORT_VALID(_processTask);
 }
 
 - (ZGMemorySize)pointerSize
 {
-	return self.is64Bit ? sizeof(int64_t) : sizeof(int32_t);
+	return _is64Bit ? sizeof(int64_t) : sizeof(int32_t);
 }
 
 @end

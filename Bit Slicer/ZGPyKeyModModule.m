@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 5/3/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,8 +31,8 @@
  */
 
 #import "ZGPyKeyModModule.h"
-#import "ZGPyUtilities.h"
-#import "ZGUtilities.h"
+#import "ZGPyModuleAdditions.h"
+#import <Cocoa/Cocoa.h>
 #import <Carbon/Carbon.h>
 
 #define KEYMOD_MODULE_NAME "keymod"

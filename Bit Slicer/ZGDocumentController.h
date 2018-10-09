@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 3/8/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,16 +32,14 @@
 
 #import <Cocoa/Cocoa.h>
 
-@class ZGProcessTaskManager;
-@class ZGDebuggerController;
-@class ZGBreakPointController;
-@class ZGHotKeyCenter;
-@class ZGLoggerWindowController;
+@class ZGDocumentWindowController;
+
+NS_ASSUME_NONNULL_BEGIN
 
 @interface ZGDocumentController : NSDocumentController
 
-- (id)initWithProcessTaskManager:(ZGProcessTaskManager *)processTaskManager debuggerController:(ZGDebuggerController *)debuggerController breakPointController:(ZGBreakPointController *)breakPointController hotKeyCenter:(ZGHotKeyCenter *)hotKeyCenter loggerWindowController:(ZGLoggerWindowController *)loggerWindowController;
-
-@property (nonatomic, copy) NSString *lastChosenInternalProcessName;
+- (id)initWithMakeDocumentWindowController:(ZGDocumentWindowController * _Nonnull (^)(void))makeDocumentWindowController;
 
 @end
+
+NS_ASSUME_NONNULL_END

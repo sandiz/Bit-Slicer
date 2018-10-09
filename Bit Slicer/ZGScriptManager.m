@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 8/25/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,8 +30,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import "ZGLoggerWindowController.h"
 #import "ZGScriptManager.h"
+#import "ZGScriptingInterpreter.h"
+#import "ZGLoggerWindowController.h"
 #import "ZGVariable.h"
 #import "ZGDocumentWindowController.h"
 #import "ZGPyScript.h"
@@ -48,231 +47,49 @@
 #import "ZGPyVMProtModule.h"
 #import "ZGSearchProgress.h"
 #import "ZGTableView.h"
-#import "ZGUtilities.h"
+#import "ZGDeliverUserNotifications.h"
 #import "ZGRegisterEntries.h"
 #import "ZGAppTerminationState.h"
 #import "ZGAppPathUtilities.h"
+#import "ZGScriptPrompt.h"
+#import "ZGScriptPromptWindowController.h"
+#import "ZGNullability.h"
 
-#import "structmember.h"
+#import "Python/structmember.h"
 
-#define SCRIPT_CACHES_PATH [[[NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES) lastObject] stringByAppendingPathComponent:[[NSBundle mainBundle] bundleIdentifier]] stringByAppendingPathComponent:@"Scripts_Temp"]
-
-#define SCRIPT_FILENAME_PREFIX @"Script"
+#define ZGLocalizableScriptManagerString(string) NSLocalizedStringFromTable(string, @"[Code] Script Manager", nil)
 
 NSString *ZGScriptDefaultApplicationEditorKey = @"ZGScriptDefaultApplicationEditorKey";
+static NSString *ZGMachineUUIDKey = @"ZGMachineUUIDKey";
 
 @interface ZGScriptManager ()
-{
-	dispatch_once_t _cleanupDispatch;
-}
 
-@property (nonatomic) ZGLoggerWindowController *loggerWindowController;
-
-@property (nonatomic) NSMutableDictionary *scriptsDictionary;
-@property (nonatomic) VDKQueue *fileWatchingQueue;
-@property (nonatomic, assign) ZGDocumentWindowController *windowController;
-@property (atomic) dispatch_source_t scriptTimer;
-@property (atomic) NSMutableArray *runningScripts;
-@property (nonatomic) NSMutableArray *objectsPool;
-@property (nonatomic) id scriptActivity;
-
-@property (nonatomic) ZGAppTerminationState *appTerminationState;
-@property (nonatomic) BOOL delayedAppTermination;
+@property (atomic) NSMutableArray<ZGPyScript *> *runningScripts;
 
 @end
 
 @implementation ZGScriptManager
-
-dispatch_queue_t gPythonQueue;
-static PyObject *gCtypesObject;
-static PyObject *gStructObject;
-
-+ (void)appendPath:(NSString *)path toSysPath:(PyObject *)sysPath
 {
-	if (path == nil) return;
-	
-	PyObject *newPath = PyUnicode_FromString([path UTF8String]);
-	if (PyList_Append(sysPath, newPath) != 0)
-	{
-		NSLog(@"Error on appending %@", path);
-	}
-	Py_XDECREF(newPath);
-}
-
-+ (void)initializePythonInterpreter
-{
-	NSString *userModulesDirectory = [ZGAppPathUtilities createUserModulesDirectory];
-	
-	NSString *pythonDirectory = [[NSBundle mainBundle] pathForResource:@"python3.3" ofType:nil];
-	setenv("PYTHONHOME", [pythonDirectory UTF8String], 1);
-	setenv("PYTHONPATH", [pythonDirectory UTF8String], 1);
-	dispatch_async(gPythonQueue, ^{
-		Py_Initialize();
-		PyObject *path = PySys_GetObject("path");
-		
-		[self appendPath:[pythonDirectory stringByAppendingPathComponent:@"lib-dynload"] toSysPath:path];
-		[self appendPath:SCRIPT_CACHES_PATH toSysPath:path];
-		[self appendPath:userModulesDirectory toSysPath:path];
-		
-		PyObject *mainModule = loadMainPythonModule();
-		[ZGPyVirtualMemory loadPythonClassInMainModule:mainModule];
-		[ZGPyDebugger loadPythonClassInMainModule:mainModule];
-		
-		loadKeyCodePythonModule();
-		loadKeyModPythonModule();
-		loadVMProtPythonModule();
-		
-		gCtypesObject = PyImport_ImportModule("ctypes");
-		gStructObject = PyImport_ImportModule("struct");
-	});
+	BOOL _cleanedUp;
+	__weak ZGDocumentWindowController * _Nonnull _windowController;
+	ZGLoggerWindowController * _Nonnull _loggerWindowController;
+	ZGScriptingInterpreter * _Nonnull _scriptingInterpreter;
+	NSMutableDictionary<NSValue *, ZGPyScript *> * _Nonnull _scriptsDictionary;
+	VDKQueue * _Nullable _fileWatchingQueue;
+	dispatch_source_t _Nullable _scriptTimer;
+	dispatch_queue_t _Nullable _scriptTimerQueue;
+	id _Nullable _scriptActivity;
+	ZGScriptPromptWindowController * _Nonnull _scriptPromptWindowController;
+	ZGAppTerminationState * _Nullable _appTerminationState;
+	BOOL _delayedAppTermination;
 }
 
 + (void)initialize
 {
-	static dispatch_once_t onceToken = 0;
+	static dispatch_once_t onceToken;
 	dispatch_once(&onceToken, ^{
-		[[NSUserDefaults standardUserDefaults] registerDefaults:@{ZGScriptDefaultApplicationEditorKey : @""}];
-		
-		NSFileManager *fileManager = [[NSFileManager alloc] init];
-		
-		if (![fileManager fileExistsAtPath:SCRIPT_CACHES_PATH])
-		{
-			[fileManager createDirectoryAtPath:SCRIPT_CACHES_PATH withIntermediateDirectories:YES attributes:nil error:nil];
-		}
-		
-		NSMutableArray *filePathsToRemove = [NSMutableArray array];
-		NSDirectoryEnumerator *directoryEnumerator = [fileManager enumeratorAtPath:SCRIPT_CACHES_PATH];
-		for (NSString *filename in directoryEnumerator)
-		{
-			if ([filename hasPrefix:SCRIPT_FILENAME_PREFIX] && [[filename pathExtension] isEqualToString:@"py"])
-			{
-				NSDictionary *fileAttributes = [fileManager attributesOfItemAtPath:[SCRIPT_CACHES_PATH stringByAppendingPathComponent:filename] error:nil];
-				if (fileAttributes != nil)
-				{
-					NSDate *lastModificationDate = [fileAttributes objectForKey:NSFileModificationDate];
-					if ([[NSDate date] timeIntervalSinceDate:lastModificationDate] > 864000) // 10 days
-					{
-						[filePathsToRemove addObject:[SCRIPT_CACHES_PATH stringByAppendingPathComponent:filename]];
-					}
-				}
-			}
-			[directoryEnumerator skipDescendants];
-		}
-		
-		for (NSString *filename in filePathsToRemove)
-		{
-			[fileManager removeItemAtPath:filename error:nil];
-		}
-		
-		gPythonQueue = dispatch_queue_create(NULL, DISPATCH_QUEUE_SERIAL);
-		
-		setenv("PYTHONDONTWRITEBYTECODE", "1", 1);
-		
-		[self initializePythonInterpreter];
+		[[NSUserDefaults standardUserDefaults] registerDefaults:@{ZGScriptDefaultApplicationEditorKey : @"", ZGMachineUUIDKey : @""}];
 	});
-}
-
-+ (PyObject *)compiledExpressionFromExpression:(NSString *)expression error:(NSError * __autoreleasing *)error
-{
-	__block PyObject *compiledExpression = NULL;
-	
-	dispatch_sync(gPythonQueue, ^{
-		compiledExpression = Py_CompileString([expression UTF8String], "EvaluateCondition", Py_eval_input);
-		
-		if (compiledExpression == NULL)
-		{
-			NSString *pythonErrorDescription = [self fetchPythonErrorDescriptionWithoutDescriptiveTraceback];
-			if (error != NULL)
-			{
-				*error = [NSError errorWithDomain:@"CompileConditionFailure" code:2 userInfo:@{SCRIPT_PYTHON_ERROR : pythonErrorDescription}];
-			}
-		}
-	});
-	
-	return compiledExpression;
-}
-
-static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries, BOOL is64Bit)
-{
-	PyObject *dictionary = PyDict_New();
-	
-	for (ZGRegisterEntry *registerEntry = registerEntries; !ZG_REGISTER_ENTRY_IS_NULL(registerEntry); registerEntry++)
-	{
-		void *value = registerEntry->value;
-		PyObject *registerObject = NULL;
-		
-		if (registerEntry->type == ZGRegisterGeneralPurpose)
-		{
-			registerObject = !is64Bit ? Py_BuildValue("I", *(uint32_t *)value) : Py_BuildValue("K", *(uint64_t *)value);
-		}
-		else
-		{
-			registerObject = Py_BuildValue("y#", value, registerEntry->size);
-		}
-		
-		if (registerObject != NULL)
-		{
-			PyDict_SetItemString(dictionary, registerEntry->name, registerObject);
-			Py_DecRef(registerObject);
-		}
-	}
-	
-	return dictionary;
-}
-
-+ (BOOL)evaluateCondition:(PyObject *)compiledExpression process:(ZGProcess *)process registerEntries:(ZGRegisterEntry *)registerEntries error:(NSError * __autoreleasing *)error
-{
-	__block BOOL result = NO;
-	dispatch_sync(gPythonQueue, ^{
-		PyObject *mainModule = PyImport_AddModule("__main__");
-		
-		ZGPyVirtualMemory *virtualMemoryInstance = [[ZGPyVirtualMemory alloc] initWithProcessNoCopy:process];
-		CFRetain((__bridge CFTypeRef)(virtualMemoryInstance));
-		
-		PyObject_SetAttrString(mainModule, "vm", virtualMemoryInstance.object);
-		
-		PyObject *globalDictionary = PyModule_GetDict(mainModule);
-		PyObject *localDictionary = convertRegisterEntriesToPyDict(registerEntries, process.is64Bit);
-		
-		PyDict_SetItemString(localDictionary, "ctypes", gCtypesObject);
-		PyDict_SetItemString(localDictionary, "struct", gStructObject);
-		
-		PyObject *evaluatedCode = PyEval_EvalCode(compiledExpression, globalDictionary, localDictionary);
-		
-		if (evaluatedCode == NULL)
-		{
-			NSString *pythonErrorDescription = [self fetchPythonErrorDescriptionWithoutDescriptiveTraceback];
-			
-			result = NO;
-			if (error != NULL)
-			{
-				*error = [NSError errorWithDomain:@"EvaluateConditionFailure" code:2 userInfo:@{SCRIPT_EVALUATION_ERROR_REASON : @"expression could not be evaluated", SCRIPT_PYTHON_ERROR : pythonErrorDescription}];
-			}
-		}
-		else
-		{
-			int temporaryResult = PyObject_IsTrue(evaluatedCode);
-			if (temporaryResult == -1)
-			{
-				result = NO;
-				if (error != NULL)
-				{
-					*error = [NSError errorWithDomain:@"EvaluateConditionFailure" code:3 userInfo:@{SCRIPT_EVALUATION_ERROR_REASON : @"expression did not evaluate to a boolean value"}];
-				}
-			}
-			else
-			{
-				result = (BOOL)temporaryResult;
-			}
-		}
-		
-		Py_XDECREF(evaluatedCode);
-		
-		Py_XDECREF(localDictionary);
-		
-		CFRelease((__bridge CFTypeRef)(virtualMemoryInstance));
-	});
-	return result;
 }
 
 - (id)initWithWindowController:(ZGDocumentWindowController *)windowController
@@ -280,51 +97,56 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 	self = [super init];
 	if (self != nil)
 	{
-		self.scriptsDictionary = [[NSMutableDictionary alloc] init];
-		self.fileWatchingQueue = [[VDKQueue alloc] init];
-		self.fileWatchingQueue.delegate = self;
-		self.windowController = windowController;
-		self.loggerWindowController = windowController.loggerWindowController;
+		_scriptsDictionary = [[NSMutableDictionary alloc] init];
+		_fileWatchingQueue = [[VDKQueue alloc] init];
+		_fileWatchingQueue.delegate = self;
+		_windowController = windowController;
+		_loggerWindowController = windowController.loggerWindowController;
+		_scriptingInterpreter = windowController.scriptingInterpreter;
+		_scriptPromptWindowController = [[ZGScriptPromptWindowController alloc] init];
 	}
 	return self;
 }
 
 - (void)cleanupWithAppTerminationState:(ZGAppTerminationState *)appTerminationState
 {
-	dispatch_once(&_cleanupDispatch, ^{
-		self.appTerminationState = appTerminationState;
+	if (!_cleanedUp)
+	{
+		_appTerminationState = appTerminationState;
 		
-		[self.scriptsDictionary enumerateKeysAndObjectsUsingBlock:^(NSValue *variableValue, ZGPyScript *pyScript, BOOL * __unused stop) {
-			if ([self.runningScripts containsObject:pyScript])
+		[_scriptsDictionary enumerateKeysAndObjectsUsingBlock:^(NSValue *variableValue, ZGPyScript *pyScript, BOOL * __unused stop) {
+			if ([[self runningScripts] containsObject:pyScript])
 			{
-				if (self.appTerminationState != nil)
+				if (self->_appTerminationState != nil)
 				{
-					[self.appTerminationState increaseLifeCount];
-					self.delayedAppTermination = YES;
+					[self->_appTerminationState increaseLifeCount];
+					self->_delayedAppTermination = YES;
 				}
-				[self stopScriptForVariable:[variableValue pointerValue]];
+				[self stopScriptForVariable:ZGUnwrapNullableObject([variableValue pointerValue])];
 			}
 		}];
 		
-		[self.fileWatchingQueue removeAllPaths];
-	});
+		[_fileWatchingQueue removeAllPaths];
+		
+		_cleanedUp = YES;
+	}
 }
 
 - (void)cleanup
 {
-	[self cleanupWithAppTerminationState:nil];
+	[self cleanupWithAppTerminationState:[[ZGAppTerminationState alloc] init]];
 }
 
 - (void)VDKQueue:(VDKQueue *)__unused queue receivedNotification:(NSString *)__unused noteName forPath:(NSString *)fullPath
 {
 	NSFileManager *fileManager = [[NSFileManager alloc] init];
 	__block BOOL assignedNewScript = NO;
-	[self.scriptsDictionary enumerateKeysAndObjectsUsingBlock:^(NSValue *variableValue, ZGPyScript *script, BOOL *stop) {
+	[_scriptsDictionary enumerateKeysAndObjectsUsingBlock:^(NSValue *variableValue, ZGPyScript *script, BOOL *stop) {
 		if ([script.path isEqualToString:fullPath])
 		{
 			if ([fileManager fileExistsAtPath:script.path])
 			{
-				NSString *newScriptValue = [[NSString alloc] initWithContentsOfFile:script.path encoding:NSUTF8StringEncoding error:nil];
+				NSString *newScriptValue = [[NSString alloc] initWithContentsOfFile:script.path encoding:NSUTF8StringEncoding error:NULL];
 				if (newScriptValue != nil)
 				{
 					ZGVariable *variable = [variableValue pointerValue];
@@ -341,17 +163,17 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 	
 	if (assignedNewScript)
 	{
-		ZGDocumentWindowController *windowController = self.windowController;
+		ZGDocumentWindowController *windowController = _windowController;
 		[windowController.variablesTableView reloadData];
 		[windowController markDocumentChange];
 	}
 	
 	// Handle atomic saves
-	[self.fileWatchingQueue removePath:fullPath];
-	[self.fileWatchingQueue addPath:fullPath];
+	[_fileWatchingQueue removePath:fullPath];
+	[_fileWatchingQueue addPath:fullPath];
 }
 
-- (void)loadCachedScriptsFromVariables:(NSArray *)variables
+- (void)loadCachedScriptsFromVariables:(NSArray<ZGVariable *> *)variables
 {
 	NSFileManager *fileManager = [[NSFileManager alloc] init];
 	BOOL needsToMarkChange = NO;
@@ -359,9 +181,10 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 	{
 		if (variable.type == ZGScript)
 		{
-			if (variable.cachedScriptPath != nil && [fileManager fileExistsAtPath:variable.cachedScriptPath])
+			NSString *cachedScriptPath = [self fullPathForRelativeScriptPath:variable.cachedScriptPath cachePath:[ZGScriptingInterpreter scriptCachesURL].path cacheUUID:variable.cachedScriptUUID];
+			if (cachedScriptPath != nil && [fileManager fileExistsAtPath:cachedScriptPath])
 			{
-				NSString *cachedScriptString = [[NSString alloc] initWithContentsOfFile:variable.cachedScriptPath encoding:NSUTF8StringEncoding error:nil];
+				NSString *cachedScriptString = [[NSString alloc] initWithContentsOfFile:cachedScriptPath encoding:NSUTF8StringEncoding error:NULL];
 				if (cachedScriptString != nil && variable.scriptValue != nil && ![variable.scriptValue isEqualToString:cachedScriptString] && cachedScriptString.length > 0)
 				{
 					variable.scriptValue = cachedScriptString;
@@ -376,49 +199,111 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 	
 	if (needsToMarkChange)
 	{
-		[self.windowController markDocumentChange];
+		ZGDocumentWindowController *windowController = _windowController;
+		[windowController markDocumentChange];
 	}
+}
+
+- (NSString *)machineUUID
+{
+	NSString *machineUUID = nil;
+	NSString *machineUUIDFromDefaults = [[NSUserDefaults standardUserDefaults] stringForKey:ZGMachineUUIDKey];
+	if (machineUUIDFromDefaults.length == 0)
+	{
+		machineUUID = [NSUUID UUID].UUIDString;
+		[[NSUserDefaults standardUserDefaults] setObject:machineUUID forKey:ZGMachineUUIDKey];
+	}
+	else
+	{
+		machineUUID = machineUUIDFromDefaults;
+	}
+	
+	return machineUUID;
+}
+
+- (NSString *)fullPathForRelativeScriptPath:(NSString *)relativeScriptPath cachePath:(NSString *)scriptCachePath cacheUUID:(NSString *)scriptCacheUUID
+{
+	if (relativeScriptPath == nil || scriptCachePath == nil)
+	{
+		return nil;
+	}
+	
+	NSString *machineUUID = [self machineUUID];
+	BOOL validUUID = scriptCacheUUID != nil && machineUUID != nil && [machineUUID isEqualToString:scriptCacheUUID];
+	if (!validUUID)
+	{
+		return nil;
+	}
+	
+	NSArray<NSString *> *relativePathComponents = relativeScriptPath.pathComponents;
+	NSArray<NSString *> *scriptCacheComponents = scriptCachePath.pathComponents;
+	
+	if (relativePathComponents.count >= scriptCacheComponents.count)
+	{
+		// Old versions used to store a full path rather than a relative one, so reaching here is possible
+		return nil;
+	}
+	
+	return [NSString pathWithComponents:[scriptCacheComponents arrayByAddingObjectsFromArray:relativePathComponents]];
+}
+
+- (NSString *)relativePathForFullScriptPath:(NSString *)fullScriptPath cachePath:(NSString *)scriptCachePath
+{
+	NSArray<NSString *> *fullPathComponents = fullScriptPath.pathComponents;
+	NSArray<NSString *> *scriptCacheComponents = scriptCachePath.pathComponents;
+	
+	assert(fullPathComponents.count > scriptCacheComponents.count);
+	
+	return [NSString pathWithComponents:[fullPathComponents subarrayWithRange:NSMakeRange(scriptCacheComponents.count, fullPathComponents.count - scriptCacheComponents.count)]];
 }
 
 - (ZGPyScript *)scriptForVariable:(ZGVariable *)variable
 {
 	NSFileManager *fileManager = [[NSFileManager alloc] init];
 	
-	ZGPyScript *script = [self.scriptsDictionary objectForKey:[NSValue valueWithNonretainedObject:variable]];
+	ZGPyScript *script = _scriptsDictionary[[NSValue valueWithNonretainedObject:variable]];
 	if (script != nil && ![fileManager fileExistsAtPath:script.path])
 	{
-		[self.scriptsDictionary removeObjectForKey:[NSValue valueWithNonretainedObject:variable]];
-		[self.fileWatchingQueue removePath:script.path];
+		[_scriptsDictionary removeObjectForKey:[NSValue valueWithNonretainedObject:variable]];
+		[_fileWatchingQueue removePath:script.path];
 		script = nil;
 	}
 	
 	if (script == nil)
 	{
-		NSString *scriptPath = nil;
+		[_scriptingInterpreter acquireInterpreter];
 		
-		if (variable.cachedScriptPath != nil && [fileManager fileExistsAtPath:variable.cachedScriptPath])
+		NSString *scriptPath = nil;
+		NSString *scriptCachesPath = ZGUnwrapNullableObject([ZGScriptingInterpreter scriptCachesURL].path);
+		NSString *relativeCachedScriptPath = variable.cachedScriptPath;
+		
+		NSString *cachedScriptPath =[self fullPathForRelativeScriptPath:relativeCachedScriptPath cachePath:scriptCachesPath cacheUUID:variable.cachedScriptUUID];
+		if (cachedScriptPath != nil && [fileManager fileExistsAtPath:cachedScriptPath])
 		{
-			scriptPath = variable.cachedScriptPath;
+			scriptPath = cachedScriptPath;
 		}
 		else
 		{
 			uint32_t randomInteger = arc4random();
 			
 			NSMutableString *randomFilename = [NSMutableString stringWithFormat:@"%@ %X", SCRIPT_FILENAME_PREFIX, randomInteger];
-			while ([fileManager fileExistsAtPath:[[SCRIPT_CACHES_PATH stringByAppendingPathComponent:randomFilename] stringByAppendingString:@".py"]])
+			while ([fileManager fileExistsAtPath:[[scriptCachesPath stringByAppendingPathComponent:randomFilename] stringByAppendingString:@".py"]])
 			{
 				[randomFilename appendString:@"1"];
 			}
 			
 			[randomFilename appendString:@".py"];
 			
-			scriptPath = [SCRIPT_CACHES_PATH stringByAppendingPathComponent:randomFilename];
+			scriptPath = [scriptCachesPath stringByAppendingPathComponent:randomFilename];
 		}
 		
 		if (variable.cachedScriptPath == nil || ![variable.cachedScriptPath isEqualToString:scriptPath])
 		{
-			variable.cachedScriptPath = scriptPath;
-			[self.windowController markDocumentChange];
+			variable.cachedScriptPath = [self relativePathForFullScriptPath:scriptPath cachePath:scriptCachesPath];
+			variable.cachedScriptUUID = [self machineUUID];
+			
+			ZGDocumentWindowController *windowController = _windowController;
+			[windowController markDocumentChange];
 		}
 		
 		NSData *scriptData = [variable.scriptValue dataUsingEncoding:NSUTF8StringEncoding];
@@ -428,15 +313,15 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 		// We have to import the module the first time succesfully so we can reload it later; to ensure this, we use an empty file
 		[[NSData data] writeToFile:scriptPath atomically:YES];
 		
-		dispatch_sync(gPythonQueue, ^{
+		[_scriptingInterpreter dispatchSync:^{
 			script.module = PyImport_ImportModule([script.moduleName UTF8String]);
-		});
+		}];
 		
 		[scriptData writeToFile:scriptPath atomically:YES];
 		
-		[self.fileWatchingQueue addPath:scriptPath];
+		[_fileWatchingQueue addPath:scriptPath];
 		
-		[self.scriptsDictionary setObject:script forKey:[NSValue valueWithNonretainedObject:variable]];
+		[_scriptsDictionary setObject:script forKey:[NSValue valueWithNonretainedObject:variable]];
 	}
 	
 	return script;
@@ -459,51 +344,13 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 	}
 }
 
-+ (NSString *)fetchPythonErrorDescriptionFromObject:(PyObject *)pythonObject
+- (void)logPythonObject:(PyObject *)pythonObject
 {
-	NSString *description = @"";
-	if (pythonObject != NULL)
-	{
-		PyObject *pythonString = PyObject_Str(pythonObject);
-		PyObject *unicodeString = PyUnicode_AsUTF8String(pythonString);
-		const char *pythonCString = PyBytes_AsString(unicodeString);
-		if (pythonCString != NULL)
-		{
-			description = @(pythonCString);
-		}
-		
-		Py_XDECREF(unicodeString);
-		Py_XDECREF(pythonString);
-	}
-	
-	Py_XDECREF(pythonObject);
-	
-	return description;
-}
-
-+ (NSString *)fetchPythonErrorDescriptionWithoutDescriptiveTraceback
-{
-	PyObject *type, *value, *traceback;
-	PyErr_Fetch(&type, &value, &traceback);
-	
-	NSArray *errorDescriptionComponents = @[[self fetchPythonErrorDescriptionFromObject:type], [self fetchPythonErrorDescriptionFromObject:value], [self fetchPythonErrorDescriptionFromObject:traceback]];
-	
-	PyErr_Clear();
-	
-	return [errorDescriptionComponents componentsJoinedByString:@"\n"];
-}
-
-+ (void)logPythonObject:(PyObject *)pythonObject withLoggerWindowController:(ZGLoggerWindowController *)loggerWindowController
-{
-	NSString *errorDescription = [[self class] fetchPythonErrorDescriptionFromObject:pythonObject];
+	NSString *errorDescription = [_scriptingInterpreter fetchPythonErrorDescriptionFromObject:pythonObject];
+	ZGLoggerWindowController *loggerWindowController = _loggerWindowController;
 	dispatch_async(dispatch_get_main_queue(), ^{
 		[loggerWindowController writeLine:errorDescription];
 	});
-}
-
-- (void)logPythonObject:(PyObject *)pythonObject
-{
-	[[self class] logPythonObject:pythonObject withLoggerWindowController:self.loggerWindowController];
 }
 
 - (void)logPythonError
@@ -511,13 +358,15 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 	PyObject *type, *value, *traceback;
 	PyErr_Fetch(&type, &value, &traceback);
 	
+	ZGDocumentWindowController *windowController = _windowController;
 	dispatch_async(dispatch_get_main_queue(), ^{
-		NSString *errorMessage = [NSString stringWithFormat:@"An error occured trying to run the script on %@", self.windowController.currentProcess.name];
-		[self.loggerWindowController writeLine:errorMessage];
+		ZGProcess *process = windowController.currentProcess;
+		NSString *errorMessage = [NSString stringWithFormat:@"An error occured trying to run the script on %@", process.name];
+		[self->_loggerWindowController writeLine:errorMessage];
 		
-		if ((![NSApp isActive] || ![self.loggerWindowController.window isVisible]))
+		if ((![NSApp isActive] || ![self->_loggerWindowController.window isVisible]))
 		{
-			ZGDeliverUserNotification(@"Script Failed", nil, errorMessage);
+			ZGDeliverUserNotification(ZGLocalizableScriptManagerString(@"scriptFailedNotificationTitle"), nil, [NSString stringWithFormat:ZGLocalizableScriptManagerString(@"scriptFailedNotificationTextFormat"), process.name], nil);
 		}
 	});
 	
@@ -546,7 +395,7 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 				if (latestLog != nil)
 				{
 					dispatch_async(dispatch_get_main_queue(), ^{
-						[self.loggerWindowController writeLine:latestLog];
+						[self->_loggerWindowController writeLine:latestLog];
 					});
 				}
 			}
@@ -574,11 +423,11 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 		
 		script.scriptObject = NULL;
 		
-		[self.scriptsDictionary enumerateKeysAndObjectsUsingBlock:^(NSValue *variableValue, ZGPyScript *pyScript, BOOL *stop) {
+		[_scriptsDictionary enumerateKeysAndObjectsUsingBlock:^(NSValue *variableValue, ZGPyScript *pyScript, BOOL *stop) {
 			if (pyScript == script)
 			{
 				dispatch_async(dispatch_get_main_queue(), ^{
-					[self stopScriptForVariable:[variableValue pointerValue]];
+					[self stopScriptForVariable:ZGUnwrapNullableObject([variableValue pointerValue])];
 				});
 				*stop = YES;
 			}
@@ -593,12 +442,12 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 	return retValue != NULL;
 }
 
-- (void)watchProcessDied:(NSNotification *)__unused notification
+- (void)triggerCurrentProcessChanged
 {
-	[self.scriptsDictionary enumerateKeysAndObjectsUsingBlock:^(NSValue *variableValue, ZGPyScript *pyScript, BOOL *__unused stop) {
-		if ([self.runningScripts containsObject:pyScript])
+	[_scriptsDictionary enumerateKeysAndObjectsUsingBlock:^(NSValue *variableValue, ZGPyScript *pyScript, BOOL *__unused stop) {
+		if ([[self runningScripts] containsObject:pyScript])
 		{
-			[self stopScriptForVariable:[variableValue pointerValue]];
+			[self stopScriptForVariable:ZGUnwrapNullableObject([variableValue pointerValue])];
 		}
 	}];
 }
@@ -608,7 +457,7 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 	if (variable.enabled)
 	{
 		variable.enabled = NO;
-		ZGDocumentWindowController *windowController = self.windowController;
+		ZGDocumentWindowController *windowController = _windowController;
 		[windowController.variablesTableView reloadData];
 		[windowController markDocumentChange];
 	}
@@ -638,7 +487,7 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 {
 	ZGPyScript *script = [self scriptForVariable:variable];
 	
-	ZGDocumentWindowController *windowController = self.windowController;
+	ZGDocumentWindowController *windowController = _windowController;
 	
 	if (!windowController.currentProcess.valid)
 	{
@@ -646,7 +495,7 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 		return;
 	}
 	
-	dispatch_async(gPythonQueue, ^{
+	[_scriptingInterpreter dispatchAsync:^{
 		script.module = PyImport_ImportModule([script.moduleName UTF8String]);
 		script.module = PyImport_ReloadModule(script.module);
 		
@@ -670,8 +519,9 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 		
 		Py_XDECREF(scriptClassType);
 		
-		ZGPyVirtualMemory *virtualMemoryInstance = [[ZGPyVirtualMemory alloc] initWithProcess:windowController.currentProcess];
-		ZGPyDebugger *debuggerInstance = [[ZGPyDebugger alloc] initWithProcess:windowController.currentProcess scriptManager:self breakPointController:self.windowController.breakPointController hotKeyCenter:self.windowController.hotKeyCenter loggerWindowController:windowController.loggerWindowController];
+		ZGPyVirtualMemory *virtualMemoryInstance = [[ZGPyVirtualMemory alloc] initWithProcess:windowController.currentProcess virtualMemoryException:(PyObject * _Nonnull)self->_scriptingInterpreter.virtualMemoryException];
+		
+		ZGPyDebugger *debuggerInstance = [[ZGPyDebugger alloc] initWithProcess:windowController.currentProcess scriptingInterpreter:self->_scriptingInterpreter scriptManager:self breakPointController:windowController.breakPointController hotKeyCenter:windowController.hotKeyCenter loggerWindowController:windowController.loggerWindowController];
 		
 		script.virtualMemoryInstance = virtualMemoryInstance;
 		script.debuggerInstance = debuggerInstance;
@@ -686,29 +536,17 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 			return;
 		}
 		
-		if (self.runningScripts == nil)
+		if ([self runningScripts] == nil)
 		{
-			self.runningScripts = [[NSMutableArray alloc] init];
+			[self setRunningScripts:[[NSMutableArray alloc] init]];
 		}
 		
-		[self.runningScripts addObject:script];
-		
-		dispatch_async(dispatch_get_main_queue(), ^{
-			[[NSNotificationCenter defaultCenter]
-			 addObserver:self
-			 selector:@selector(watchProcessDied:)
-			 name:ZGTargetProcessDiedNotification
-			 object:self.windowController.currentProcess];
-		});
+		[[self runningScripts] addObject:script];
 		
 		PyObject_SetAttrString(script.module, "vm", virtualMemoryInstance.object);
 		PyObject_SetAttrString(script.module, "debug", debuggerInstance.object);
 		
-		id scriptInitActivity = nil;
-		if ([[NSProcessInfo processInfo] respondsToSelector:@selector(beginActivityWithOptions:reason:)])
-		{
-			scriptInitActivity = [[NSProcessInfo processInfo] beginActivityWithOptions:NSActivityUserInitiated reason:@"Script initializer"];
-		}
+		id scriptInitActivity = [[NSProcessInfo processInfo] beginActivityWithOptions:NSActivityUserInitiated reason:@"Script initializer"];
 		
 		[self setUpStackDepthLimit];
 		
@@ -716,7 +554,10 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 		
 		if (scriptInitActivity != nil)
 		{
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wpartial-availability"
 			[[NSProcessInfo processInfo] endActivity:scriptInitActivity];
+#pragma clang diagnostic pop
 		}
 		
 		BOOL stillInitialized = (BOOL)Py_IsInitialized();
@@ -749,29 +590,40 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 		
 		script.executeFunction = PyObject_GetAttrString(script.scriptObject, executeFunctionName);
 		
-		if (self.scriptTimer == NULL && (self.scriptTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, gPythonQueue)) != NULL)
+		if (self->_scriptTimer == NULL)
 		{
-			dispatch_async(dispatch_get_main_queue(), ^{
-				if ([[NSProcessInfo processInfo] respondsToSelector:@selector(beginActivityWithOptions:reason:)])
-				{
-					self.scriptActivity = [[NSProcessInfo processInfo] beginActivityWithOptions:NSActivityUserInitiated reason:@"Script execute timer"];
-				}
-			});
+			self->_scriptTimerQueue = dispatch_queue_create(NULL, DISPATCH_QUEUE_SERIAL);
+			assert(self->_scriptTimerQueue != NULL);
 			
-			dispatch_source_set_timer(self.scriptTimer, DISPATCH_TIME_NOW, NSEC_PER_SEC * 3 / 100, NSEC_PER_SEC * 1 / 100);
-			dispatch_source_set_event_handler(self.scriptTimer, ^{
-				for (ZGPyScript *runningScript in self.runningScripts)
-				{
-					NSTimeInterval currentTime = [NSDate timeIntervalSinceReferenceDate];
-					runningScript.deltaTime = currentTime - runningScript.lastTime;
-					runningScript.lastTime = currentTime;
-					[self executeScript:runningScript];
-				}
-			});
-			dispatch_resume(self.scriptTimer);
+			self->_scriptTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self->_scriptTimerQueue);
+			if (self->_scriptTimer != NULL)
+			{
+				dispatch_async(dispatch_get_main_queue(), ^{
+					self->_scriptActivity = [[NSProcessInfo processInfo] beginActivityWithOptions:NSActivityUserInitiated reason:@"Script execute timer"];
+				});
+				
+				dispatch_source_t scriptTimer = self->_scriptTimer;
+				
+				dispatch_source_set_timer(scriptTimer, DISPATCH_TIME_NOW, NSEC_PER_SEC * 3 / 100, NSEC_PER_SEC * 1 / 100);
+				dispatch_source_set_event_handler(scriptTimer, ^{
+					for (ZGPyScript *runningScript in [self runningScripts])
+					{
+						if (runningScript.executeFunction != NULL)
+						{
+							[self->_scriptingInterpreter dispatchAsync:^{
+								NSTimeInterval currentTime = [NSDate timeIntervalSinceReferenceDate];
+								runningScript.deltaTime = currentTime - runningScript.lastTime;
+								runningScript.lastTime = currentTime;
+								[self executeScript:runningScript];
+							}];
+						}
+					}
+				});
+				dispatch_resume(scriptTimer);
+			}
 		}
 		
-		if (self.scriptTimer == NULL)
+		if (self->_scriptTimer == NULL)
 		{
 			dispatch_async(dispatch_get_main_queue(), ^{
 				[self stopScriptForVariable:variable];
@@ -779,16 +631,16 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 		}
 		
 		Py_XDECREF(initMethodResult);
-	});
+	}];
 }
 
 - (void)removeScriptForVariable:(ZGVariable *)variable
 {
-	ZGPyScript *script = [self.scriptsDictionary objectForKey:[NSValue valueWithNonretainedObject:variable]];
+	ZGPyScript *script = [_scriptsDictionary objectForKey:[NSValue valueWithNonretainedObject:variable]];
 	if (script != nil)
 	{
-		[self.fileWatchingQueue removePath:script.path];
-		[self.scriptsDictionary removeObjectForKey:[NSValue valueWithNonretainedObject:variable]];
+		[_fileWatchingQueue removePath:script.path];
+		[_scriptsDictionary removeObjectForKey:[NSValue valueWithNonretainedObject:variable]];
 	}
 }
 
@@ -798,32 +650,48 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 	
 	ZGPyScript *script = [self scriptForVariable:variable];
 	
-	if ([self.runningScripts containsObject:script])
+	if ([[self runningScripts] containsObject:script])
 	{
-		[self.runningScripts removeObject:script];
-		if (self.runningScripts.count == 0)
+		ZGDocumentWindowController *windowController = _windowController;
+		
+		[[self runningScripts] removeObject:script];
+		if ([self runningScripts].count == 0)
 		{
-			dispatch_async(gPythonQueue, ^{
-				if (self.scriptTimer != NULL)
-				{
-					dispatch_source_cancel(self.scriptTimer);
-					self.scriptTimer = NULL;
-					dispatch_async(dispatch_get_main_queue(), ^{
-						if (self.scriptActivity != nil)
-						{
-							[[NSProcessInfo processInfo] endActivity:self.scriptActivity];
-							self.scriptActivity = nil;
-						}
-						
-						[self.windowController updateOcclusionActivity];
-					});
-				}
-			});
-			
-			[[NSNotificationCenter defaultCenter] removeObserver:self];
+			if (_scriptTimerQueue != NULL)
+			{
+				dispatch_async((_Nonnull dispatch_queue_t)_scriptTimerQueue, ^{
+					if (self->_scriptTimer != NULL)
+					{
+						dispatch_source_cancel((_Nonnull dispatch_source_t)self->_scriptTimer);
+						self->_scriptTimer = NULL;
+						dispatch_async(dispatch_get_main_queue(), ^{
+							if (self->_scriptActivity != nil)
+							{
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wpartial-availability"
+								[[NSProcessInfo processInfo] endActivity:(id _Nonnull)self->_scriptActivity];
+#pragma clang diagnostic pop
+								self->_scriptActivity = nil;
+							}
+							
+							[windowController updateOcclusionActivity];
+						});
+					}
+				});
+				
+				_scriptTimerQueue = NULL;
+			}
 		}
 		
-		BOOL delayedAppTermination = self.delayedAppTermination;
+		if ([self hasAttachedPrompt] && _scriptPromptWindowController.delegate == script.debuggerInstance)
+		{
+			ZGScriptPrompt *scriptPrompt = _scriptPromptWindowController.scriptPrompt;
+			[self removeUserNotificationsForScriptPrompt:scriptPrompt];
+			
+			[_scriptPromptWindowController terminateSession];
+		}
+		
+		BOOL delayedAppTermination = _delayedAppTermination;
 		
 		NSUInteger scriptFinishedCount = script.finishedCount;
 		
@@ -839,15 +707,15 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 		
 		[script.virtualMemoryInstance.searchProgress setShouldCancelSearch:YES];
 		
-		dispatch_async(gPythonQueue, ^{
+		[_scriptingInterpreter dispatchAsync:^{
 			if (script.finishedCount == scriptFinishedCount)
 			{
 				if (!delayedAppTermination)
 				{
-					const char *finishFunctionName = "finish";
-					if (Py_IsInitialized() && self.windowController.currentProcess.valid && script.scriptObject != NULL && PyObject_HasAttrString(script.scriptObject, finishFunctionName))
+					char finishFunctionName[] = "finish";
+					if (Py_IsInitialized() && windowController.currentProcess.valid && script.scriptObject != NULL && PyObject_HasAttrString(script.scriptObject, finishFunctionName))
 					{
-						PyObject *retValue = PyObject_CallMethod(script.scriptObject, (char *)finishFunctionName, NULL);
+						PyObject *retValue = PyObject_CallMethod(script.scriptObject, finishFunctionName, NULL);
 						if (Py_IsInitialized())
 						{
 							if (retValue == NULL)
@@ -864,39 +732,39 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 				if (delayedAppTermination)
 				{
 					dispatch_async(dispatch_get_main_queue(), ^{
-						[self.appTerminationState decreaseLifeCount];
+						[self->_appTerminationState decreaseLifeCount];
 					});
 				}
 			}
-		});
+		}];
 		
 		dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC / 2), dispatch_get_main_queue(), ^{
 			if (scriptFinishedCount == script.finishedCount)
 			{
 				if (delayedAppTermination)
 				{
-					[self.appTerminationState decreaseLifeCount];
+					[self->_appTerminationState decreaseLifeCount];
 				}
 				else
 				{
 					// Give up - this should be okay to call from another thread
 					PyErr_SetInterrupt();
 					
-					dispatch_async(gPythonQueue, ^{
+					[self->_scriptingInterpreter dispatchAsync:^{
 						scriptCleanup();
-					});
+					}];
 				}
 			}
 		});
 	}
 }
 
-- (void)handleCallbackFailureWithVariable:(ZGVariable *)variable methodCallResult:(PyObject *)methodCallResult forMethodName:(NSString *)methodName
+- (void)handleFailureWithVariable:(ZGVariable *)variable methodCallResult:(PyObject *)methodCallResult forMethodName:(NSString *)methodName
 {
 	if (methodCallResult == NULL)
 	{
 		dispatch_async(dispatch_get_main_queue(), ^{
-			[self.loggerWindowController writeLine:[NSString stringWithFormat:@"Exception raised in %@ callback", methodName]];
+			[self->_loggerWindowController writeLine:[NSString stringWithFormat:@"Exception raised in %@", methodName]];
 		});
 		[self logPythonError];
 		dispatch_async(dispatch_get_main_queue(), ^{
@@ -905,35 +773,87 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 	}
 }
 
-- (PyObject *)registersfromRegistersState:(ZGRegistersState *)registersState
+- (BOOL)hasAttachedPrompt
 {
-	ZGRegisterEntry registerEntries[ZG_MAX_REGISTER_ENTRIES];
-	BOOL is64Bit = registersState.is64Bit;
-	
-	int numberOfGeneralPurposeEntries = [ZGRegisterEntries getRegisterEntries:registerEntries fromGeneralPurposeThreadState:registersState.generalPurposeThreadState is64Bit:is64Bit];
-	
-	if (registersState.hasVectorState)
+	return _scriptPromptWindowController.isAttached;
+}
+
+- (void)showScriptPrompt:(ZGScriptPrompt *)scriptPrompt delegate:(id <ZGScriptPromptDelegate>)delegate
+{
+	if (![self hasAttachedPrompt])
 	{
-		[ZGRegisterEntries getRegisterEntries:registerEntries + numberOfGeneralPurposeEntries fromVectorThreadState:registersState.vectorState is64Bit:is64Bit hasAVXSupport:registersState.hasAVXSupport];
+		ZGDocumentWindowController *windowController = _windowController;
+		if (windowController != nil)
+		{
+			ZGDeliverUserNotificationWithReply(ZGLocalizableScriptManagerString(@"scriptPromptNotificationTitle"), windowController.currentProcess.name, scriptPrompt.message, scriptPrompt.answer, @{ZGScriptNotificationPromptHashKey : @(scriptPrompt.hash)});
+			
+			[_scriptPromptWindowController attachToWindow:ZGUnwrapNullableObject(windowController.window) withScriptPrompt:scriptPrompt delegate:delegate];
+		}
 	}
+}
+
+- (void)handleScriptPromptHash:(NSNumber *)scriptPromptHash withUserNotificationReply:(NSString *)reply
+{
+	if ([scriptPromptHash isEqualToNumber:@(_scriptPromptWindowController.scriptPrompt.hash)])
+	{
+		[_scriptPromptWindowController terminateSessionWithAnswer:reply];
+	}
+}
+
+- (void)removeUserNotifications:(NSArray<NSUserNotification *> *)userNotifications withScriptPrompt:(ZGScriptPrompt *)scriptPrompt
+{
+	for (NSUserNotification *userNotification in userNotifications)
+	{
+		NSNumber *scriptPromptHash = userNotification.userInfo[ZGScriptNotificationPromptHashKey];
+		if (scriptPromptHash != nil && [scriptPromptHash isEqualToNumber:@(scriptPrompt.hash)])
+		{
+			[[NSUserNotificationCenter defaultUserNotificationCenter] removeScheduledNotification:userNotification];
+		}
+	}
+}
+
+- (void)removeUserNotificationsForScriptPrompt:(ZGScriptPrompt *)scriptPrompt
+{
+	NSUserNotificationCenter *userNotificationCenter = [NSUserNotificationCenter defaultUserNotificationCenter];
+	[self removeUserNotifications:userNotificationCenter.scheduledNotifications withScriptPrompt:scriptPrompt];
+	[self removeUserNotifications:userNotificationCenter.deliveredNotifications withScriptPrompt:scriptPrompt];
+}
+
+- (void)handleScriptPrompt:(ZGScriptPrompt *)scriptPrompt withAnswer:(NSString *)answer sender:(id)sender
+{
+	[self removeUserNotificationsForScriptPrompt:scriptPrompt];
 	
-	return convertRegisterEntriesToPyDict(registerEntries, is64Bit);
+	dispatch_async(dispatch_get_main_queue(), ^{
+		[self->_scriptsDictionary enumerateKeysAndObjectsUsingBlock:^(NSValue *variableValue, ZGPyScript *pyScript, __unused BOOL *stop) {
+			[self->_scriptingInterpreter dispatchAsync:^{
+				if (Py_IsInitialized() && pyScript.debuggerInstance == sender)
+				{
+					PyObject *callback = scriptPrompt.userData;
+					PyObject *result = (answer != nil) ? PyObject_CallFunction(callback, "s", [answer UTF8String]) : PyObject_CallFunction(callback, "O", Py_None);
+					
+					[self handleFailureWithVariable:[variableValue pointerValue] methodCallResult:result forMethodName:@"script prompt callback"];
+					Py_XDECREF(callback);
+					Py_XDECREF(result);
+				}
+			}];
+		}];
+	});
 }
 
 - (void)handleDataAddress:(ZGMemoryAddress)dataAddress accessedFromInstructionAddress:(ZGMemoryAddress)instructionAddress registersState:(ZGRegistersState *)registersState callback:(PyObject *)callback sender:(id)sender
 {
 	dispatch_async(dispatch_get_main_queue(), ^{
-		[self.scriptsDictionary enumerateKeysAndObjectsUsingBlock:^(NSValue *variableValue, ZGPyScript *pyScript, __unused BOOL *stop) {
-			dispatch_async(gPythonQueue, ^{
+		[self->_scriptsDictionary enumerateKeysAndObjectsUsingBlock:^(NSValue *variableValue, ZGPyScript *pyScript, __unused BOOL *stop) {
+			[self->_scriptingInterpreter dispatchAsync:^{
 				if (Py_IsInitialized() && pyScript.debuggerInstance == sender)
 				{
-					PyObject *registers = [self registersfromRegistersState:registersState];
+					PyObject *registers = [self->_scriptingInterpreter registersfromRegistersState:registersState];
 					PyObject *result = PyObject_CallFunction(callback, "KKO", dataAddress, instructionAddress, registers);
-					[self handleCallbackFailureWithVariable:[variableValue pointerValue] methodCallResult:result forMethodName:@"data watchpoint"];
+					[self handleFailureWithVariable:[variableValue pointerValue] methodCallResult:result forMethodName:@"data watchpoint callback"];
 					Py_XDECREF(registers);
 					Py_XDECREF(result);
 				}
-			});
+			}];
 		}];
 	});
 }
@@ -941,24 +861,26 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 - (void)handleInstructionBreakPoint:(ZGBreakPoint *)breakPoint withRegistersState:(ZGRegistersState *)registersState callback:(PyObject *)callback sender:(id)sender
 {
 	dispatch_async(dispatch_get_main_queue(), ^{
-		[self.scriptsDictionary enumerateKeysAndObjectsUsingBlock:^(NSValue *variableValue, ZGPyScript *pyScript, __unused BOOL *stop) {
-			dispatch_async(gPythonQueue, ^{
+		BOOL breakPointHidden = breakPoint.hidden;
+		
+		[self->_scriptsDictionary enumerateKeysAndObjectsUsingBlock:^(NSValue *variableValue, ZGPyScript *pyScript, __unused BOOL *stop) {
+			[self->_scriptingInterpreter dispatchAsync:^{
 				if (Py_IsInitialized() && pyScript.debuggerInstance == sender)
 				{
-					PyObject *registers = [self registersfromRegistersState:registersState];
+					PyObject *registers = [self->_scriptingInterpreter registersfromRegistersState:registersState];
 					PyObject *result = PyObject_CallFunction(callback, "KO", breakPoint.variable.address, registers);
 					Py_XDECREF(registers);
 					
-					[self handleCallbackFailureWithVariable:[variableValue pointerValue] methodCallResult:result forMethodName:@"instruction breakpoint"];
+					[self handleFailureWithVariable:[variableValue pointerValue] methodCallResult:result forMethodName:@"instruction breakpoint callback"];
 					Py_XDECREF(result);
 					
-					if (breakPoint.hidden && breakPoint.callback != NULL)
+					if (breakPointHidden && breakPoint.callback != NULL)
 					{
 						Py_DecRef(breakPoint.callback);
 						breakPoint.callback = NULL;
 					}
 				}
-			});
+			}];
 		}];
 	});
 }
@@ -966,15 +888,15 @@ static PyObject *convertRegisterEntriesToPyDict(ZGRegisterEntry *registerEntries
 - (void)handleHotKeyTriggerWithInternalID:(UInt32)hotKeyID callback:(PyObject *)callback sender:(id)sender
 {
 	dispatch_async(dispatch_get_main_queue(), ^{
-		[self.scriptsDictionary enumerateKeysAndObjectsUsingBlock:^(NSValue *variableValue, ZGPyScript *pyScript, __unused BOOL *stop) {
-			dispatch_async(gPythonQueue, ^{
+		[self->_scriptsDictionary enumerateKeysAndObjectsUsingBlock:^(NSValue *variableValue, ZGPyScript *pyScript, __unused BOOL *stop) {
+			[self->_scriptingInterpreter dispatchAsync:^{
 				if (Py_IsInitialized() && pyScript.debuggerInstance == sender)
 				{
 					PyObject *result = PyObject_CallFunction(callback, "I", hotKeyID);
-					[self handleCallbackFailureWithVariable:[variableValue pointerValue] methodCallResult:result forMethodName:@"hotkey trigger"];
+					[self handleFailureWithVariable:[variableValue pointerValue] methodCallResult:result forMethodName:@"hotkey trigger callback"];
 					Py_XDECREF(result);
 				}
-			});
+			}];
 		}];
 	});
 }

@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 11/29/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,20 +34,19 @@
 #import "ZGVariableController.h"
 #import "ZGCalculator.h"
 #import "NSStringAdditions.h"
-#import "ZGUtilities.h"
+#import "ZGMemoryAddressExpressionParsing.h"
+#import "ZGRunAlertPanel.h"
+#import "ZGNullability.h"
 
 #define ZGEditSizeLocalizableTable @"[Code] Edit Variable Size"
 
-@interface ZGEditSizeWindowController ()
-
-@property (nonatomic) ZGVariableController *variableController;
-@property (nonatomic) NSArray *variables;
-
-@property (nonatomic, assign) IBOutlet NSTextField *sizeTextField;
-
-@end
-
 @implementation ZGEditSizeWindowController
+{
+	ZGVariableController * _Nonnull _variableController;
+	NSArray<ZGVariable *> * _Nullable _variables;
+	
+	IBOutlet NSTextField *_sizeTextField;
+}
 
 - (NSString *)windowNibName
 {
@@ -61,33 +58,29 @@
 	self = [super init];
 	if (self != nil)
 	{
-		self.variableController = variableController;
+		_variableController = variableController;
 	}
 	return self;
 }
 
-- (void)requestEditingSizesFromVariables:(NSArray *)variables attachedToWindow:(NSWindow *)parentWindow
+- (void)requestEditingSizesFromVariables:(NSArray<ZGVariable *> *)variables attachedToWindow:(NSWindow *)parentWindow
 {
-	[self window]; // ensure window is loaded
+	NSWindow *window = ZGUnwrapNullableObject([self window]); // ensure window is loaded
 	
 	ZGVariable *firstVariable = [variables objectAtIndex:0];
-	self.sizeTextField.stringValue = firstVariable.sizeStringValue;
+	_sizeTextField.stringValue = firstVariable.sizeStringValue;
 	
-	[self.sizeTextField selectText:nil];
+	[_sizeTextField selectText:nil];
 	
-	self.variables = variables;
+	_variables = variables;
 	
-	[NSApp
-	 beginSheet:self.window
-	 modalForWindow:parentWindow
-	 modalDelegate:self
-	 didEndSelector:nil
-	 contextInfo:NULL];
+	[parentWindow beginSheet:window completionHandler:^(NSModalResponse __unused returnCode) {
+	}];
 }
 
 - (IBAction)editVariablesSizes:(id)__unused sender
 {
-	NSString *sizeExpression = [ZGCalculator evaluateExpression:self.sizeTextField.stringValue];
+	NSString *sizeExpression = [ZGCalculator evaluateExpression:_sizeTextField.stringValue];
 	
 	ZGMemorySize requestedSize = 0;
 	if (sizeExpression.zgIsHexRepresentation)
@@ -109,31 +102,31 @@
 	}
 	else
 	{
-		[NSApp endSheet:self.window];
-		[self.window close];
+		NSWindow *window = ZGUnwrapNullableObject(self.window);
+		[NSApp endSheet:window];
+		[window close];
 		
-		NSMutableArray *requestedSizes = [[NSMutableArray alloc] init];
+		NSMutableArray<NSNumber *> *requestedSizes = [[NSMutableArray alloc] init];
 		
 		NSUInteger variableIndex;
-		for (variableIndex = 0; variableIndex < self.variables.count; variableIndex++)
+		for (variableIndex = 0; variableIndex < _variables.count; variableIndex++)
 		{
 			[requestedSizes addObject:@(requestedSize)];
 		}
 		
-		[self.variableController
-		 editVariables:self.variables
-		 requestedSizes:requestedSizes];
+		[_variableController editVariables:ZGUnwrapNullableObject(_variables) requestedSizes:requestedSizes];
 		
-		self.variables = nil;
+		_variables = nil;
 	}
 }
 
 - (IBAction)cancelEditingVariablesSizes:(id)__unused sender
 {
-	[NSApp endSheet:self.window];
-	[self.window close];
+	NSWindow *window = ZGUnwrapNullableObject(self.window);
+	[NSApp endSheet:window];
+	[window close];
 	
-	self.variables = nil;
+	_variables = nil;
 }
 
 @end

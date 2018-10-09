@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 5/3/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,9 +31,8 @@
  */
 
 #import "ZGPyKeyCodeModule.h"
-#import "ZGUtilities.h"
 #import <Carbon/Carbon.h>
-#import "ZGPyUtilities.h"
+#import "ZGPyModuleAdditions.h"
 
 #define KEYCODE_MODULE_NAME "keycode"
 

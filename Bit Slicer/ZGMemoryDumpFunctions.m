@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 2/12/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,35 +34,25 @@
 #import "ZGVirtualMemory.h"
 #import "ZGSearchProgress.h"
 #import "ZGRegion.h"
+#import "ZGProtectionDescription.h"
+#import "ZGMachBinary.h"
+#import "ZGMachBinaryInfo.h"
+#import "ZGProcess.h"
+#import "NSArrayAdditions.h"
+#import "ZGDebugLogging.h"
 
-// helper function for ZGSaveAllDataToDirectory
-static void ZGDumpPieceOfData(NSMutableData *currentData, ZGMemoryAddress currentStartingAddress, NSString *directory, int *fileNumber, FILE *mergedFile)
+BOOL ZGDumpAllDataToDirectory(NSString *directory, ZGProcess *process, id <ZGSearchProgressDelegate> delegate)
 {
-	if (currentData != nil)
+	NSString *mergedPath = [directory stringByAppendingPathComponent:ZGLocalizedStringFromDumpAllMemoryTable(@"mergedFilename")];
+	
+	FILE *mergedFile = fopen(mergedPath.UTF8String, "w");
+	if (mergedFile == NULL)
 	{
-		ZGMemoryAddress endAddress = currentStartingAddress + [currentData length];
-		(*fileNumber)++;
-		[currentData
-		 writeToFile:[directory stringByAppendingPathComponent:[[NSString alloc] initWithFormat:@"(%d) 0x%llX - 0x%llX", *fileNumber, currentStartingAddress, endAddress]]
-		 atomically:NO];
-		
-		if (mergedFile != NULL)
-		{
-			fwrite(currentData.bytes, currentData.length, 1, mergedFile);
-		}
+		NSLog(@"Failed to create merged file at %@ with error %s", mergedPath, strerror(errno));
+		return NO;
 	}
-}
-
-BOOL ZGDumpAllDataToDirectory(NSString *directory, ZGMemoryMap processTask, id <ZGSearchProgressDelegate> delegate)
-{
-	NSMutableData *currentData = nil;
-	ZGMemoryAddress currentStartingAddress = 0;
-	ZGMemoryAddress lastAddress = currentStartingAddress;
-	int fileNumber = 0;
 	
-	FILE *mergedFile = fopen([directory stringByAppendingPathComponent:ZGLocalizedStringFromDumpAllMemoryTable(@"mergedFilename")].UTF8String, "w");
-	
-	NSArray *regions = [ZGRegion submapRegionsFromProcessTask:processTask];
+	NSArray<ZGRegion *> *regions = [ZGRegion submapRegionsFromProcessTask:process.processTask];
 	
 	ZGSearchProgress *searchProgress = [[ZGSearchProgress alloc] initWithProgressType:ZGSearchProgressMemoryDumping maxProgress:regions.count];
 	
@@ -72,54 +60,65 @@ BOOL ZGDumpAllDataToDirectory(NSString *directory, ZGMemoryMap processTask, id <
 		[delegate progressWillBegin:searchProgress];
 	});
 	
+	NSUInteger regionNumber = 0;
 	for (ZGRegion *region in regions)
 	{
-		if (lastAddress != region.address || !(region.protection & VM_PROT_READ))
+		if ((region.protection & VM_PROT_READ) != 0)
 		{
-			// We're done with this piece of data
-			ZGDumpPieceOfData(currentData, currentStartingAddress, directory, &fileNumber, mergedFile);
-			currentData = nil;
-		}
-		
-		if (region.protection & VM_PROT_READ)
-		{
-			if (!currentData)
-			{
-				currentData = [[NSMutableData alloc] init];
-				currentStartingAddress = region.address;
-			}
-			
-			// outputSize should not differ from size
 			ZGMemorySize outputSize = region.size;
 			void *bytes = NULL;
-			if (ZGReadBytes(processTask, region.address, &bytes, &outputSize))
+			if (ZGReadBytes(process.processTask, region.address, &bytes, &outputSize))
 			{
-				[currentData appendBytes:bytes length:(NSUInteger)outputSize];
+				NSString *regionPath = [directory stringByAppendingPathComponent:[NSString stringWithFormat:@"(%lu) 0x%llX - 0x%llX %@", (unsigned long)regionNumber, region.address, region.address + outputSize, ZGProtectionDescription(region.protection)]];
+				
+				NSData *regionData = [NSData dataWithBytesNoCopy:bytes length:outputSize freeWhenDone:NO];
+				
+				BOOL wroteRegionOutToFile = [regionData writeToFile:regionPath atomically:YES];
+				if (wroteRegionOutToFile)
+				{
+					if (fwrite(regionData.bytes, regionData.length, 1, mergedFile) == 0)
+					{
+						ZG_LOG(@"Error: Failed to dump region bytes 0x%llX - 0x%llX to merge file", region.address, region.address + outputSize);
+					}
+					regionNumber++;
+				}
+				
 				ZGFreeBytes(bytes, outputSize);
 			}
 		}
 		
-		lastAddress = region.address;
-		
 		dispatch_async(dispatch_get_main_queue(), ^{
 			searchProgress.progress++;
-			[delegate progress:searchProgress advancedWithResultSet:nil];
+			[delegate progress:searchProgress advancedWithResultSet:[NSData data]];
 		});
-  	    
+		
 		if (searchProgress.shouldCancelSearch)
 		{
 			break;
 		}
 	}
 	
+	fclose(mergedFile);
+	
 	if (!searchProgress.shouldCancelSearch)
 	{
-		ZGDumpPieceOfData(currentData, currentStartingAddress, directory, &fileNumber, mergedFile);
-	}
-	
-	if (mergedFile != NULL)
-	{
-		fclose(mergedFile);
+		NSString *imagesPath = [directory stringByAppendingPathComponent:ZGLocalizedStringFromDumpAllMemoryTable(@"machBinaryImagesFilename")];
+		
+		NSArray<ZGMachBinary *> *machBinaries = [ZGMachBinary machBinariesInProcess:process];
+		NSError *machBinaryImagesError = nil;
+		
+		NSArray<NSString *> *header = @[[@"#" stringByAppendingString:[@[@"Path", @"Start", @"End"] componentsJoinedByString:@"\t"]]];
+		if (![[[header arrayByAddingObjectsFromArray:[machBinaries zgMapUsingBlock:^(ZGMachBinary *machBinary) {
+			NSString *filePath = [machBinary filePathInProcess:process];
+			
+			ZGMachBinaryInfo *machBinaryInfo = [machBinary machBinaryInfoInProcess:process];
+			NSRange imageRange = machBinaryInfo.totalSegmentRange;
+			
+			return [@[filePath, [NSString stringWithFormat:@"0x%lX", imageRange.location], [NSString stringWithFormat:@"0x%lX", imageRange.location + imageRange.length]] componentsJoinedByString:@"\t"];
+		}]] componentsJoinedByString:@"\n"] writeToFile:imagesPath atomically:YES encoding:NSUTF8StringEncoding error:&machBinaryImagesError])
+		{
+			NSLog(@"Failed to write mach binary images info file at %@ with error: %@", imagesPath, machBinaryImagesError);
+		}
 	}
 	
 	return YES;

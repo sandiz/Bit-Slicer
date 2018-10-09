@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 9/2/13.
- *
- * Copyright (c) 2013 zgcoder
+ * Copyright (c) 2013 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,7 +31,7 @@
  */
 
 #import "ZGPyMainModule.h"
-#import "ZGPyUtilities.h"
+#import "ZGPyModuleAdditions.h"
 
 #define MAIN_MODULE_NAME "bitslicer"
 
@@ -41,7 +39,8 @@ static PyObject *BitSlicer_reload(PyObject *self, PyObject *args);
 
 static PyMethodDef mainModuleMethods[] =
 {
-	{"reload", (PyCFunction)BitSlicer_reload, METH_VARARGS, NULL}
+	{"reload", BitSlicer_reload, METH_VARARGS, NULL},
+	{NULL, NULL, 0, NULL}
 };
 
 static struct PyModuleDef mainModuleDefinition =
@@ -57,6 +56,11 @@ static struct PyModuleDef mainModuleDefinition =
 PyObject *loadMainPythonModule(void)
 {
 	PyObject *mainModule = PyModule_Create(&mainModuleDefinition);
+	if (mainModule == NULL)
+	{
+		return NULL;
+	}
+	
 	ZGPyAddModuleToSys(MAIN_MODULE_NAME, mainModule);
 	return mainModule;
 }

@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 3/9/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,7 +36,7 @@
 
 @implementation ZGHotKeyCenter
 {
-	NSMutableArray *_registeredHotKeys;
+	NSMutableArray<ZGHotKey *> * _Nullable _registeredHotKeys;
 	UInt32 _nextRegisteredHotKeyID;
 }
 
@@ -55,7 +53,8 @@ static OSStatus hotKeyHandler(EventHandlerCallRef __unused nextHandler, EventRef
 			{
 				if (registeredHotKey.internalID == hotKeyID.id)
 				{
-					[registeredHotKey.delegate hotKeyDidTrigger:registeredHotKey];
+					id <ZGHotKeyDelegate> delegate = registeredHotKey.delegate;
+					[delegate hotKeyDidTrigger:registeredHotKey];
 					break;
 				}
 			}
@@ -145,9 +144,9 @@ static OSStatus hotKeyHandler(EventHandlerCallRef __unused nextHandler, EventRef
 	return foundHotKey;
 }
 
-- (NSArray *)unregisterHotKeysWithDelegate:(id <ZGHotKeyDelegate>)delegate
+- (NSArray<ZGHotKey *> *)unregisterHotKeysWithDelegate:(id <ZGHotKeyDelegate>)delegate
 {
-	NSMutableArray *foundHotKeys = [NSMutableArray array];
+	NSMutableArray<ZGHotKey *> *foundHotKeys = [NSMutableArray array];
 	for (ZGHotKey *hotKey in _registeredHotKeys)
 	{
 		if (hotKey.delegate == delegate)
@@ -176,14 +175,14 @@ static OSStatus hotKeyHandler(EventHandlerCallRef __unused nextHandler, EventRef
 	CFArrayRef cfSystemHotKeyDictionaries = NULL;
 	if (CopySymbolicHotKeys(&cfSystemHotKeyDictionaries) == noErr)
 	{
-		NSArray *systemHotKeyDictionaries = (__bridge_transfer NSArray *)cfSystemHotKeyDictionaries;
-		for (NSDictionary *hotKeyDictionary in systemHotKeyDictionaries)
+		NSArray<NSDictionary<NSString *, id> *> *systemHotKeyDictionaries = (__bridge_transfer NSArray *)cfSystemHotKeyDictionaries;
+		for (NSDictionary<NSString *, id> *hotKeyDictionary in systemHotKeyDictionaries)
 		{
-			BOOL enabled = [[hotKeyDictionary objectForKey:(NSString *)kHISymbolicHotKeyEnabled] boolValue];
+			BOOL enabled = [(NSNumber *)[hotKeyDictionary objectForKey:(__bridge NSString *)kHISymbolicHotKeyEnabled] boolValue];
 			if (enabled)
 			{
-				UInt32 keyCode = [[hotKeyDictionary objectForKey:(NSString *)kHISymbolicHotKeyCode] unsignedIntValue];
-				UInt32 modifierFlags = [[hotKeyDictionary objectForKey:(NSString *)kHISymbolicHotKeyModifiers] unsignedIntValue];
+				UInt32 keyCode = [(NSNumber *)[hotKeyDictionary objectForKey:(__bridge NSString *)kHISymbolicHotKeyCode] unsignedIntValue];
+				UInt32 modifierFlags = [(NSNumber *)[hotKeyDictionary objectForKey:(__bridge NSString *)kHISymbolicHotKeyModifiers] unsignedIntValue];
 				if (hotKey.keyCombo.code == keyCode && hotKey.keyCombo.flags == modifierFlags)
 				{
 					return YES;

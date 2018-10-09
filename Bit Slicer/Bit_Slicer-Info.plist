@@ -30,7 +30,7 @@
 	<key>CFBundleIconFile</key>
 	<string>bitslicericon.icns</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.zgcoder.BitSlicer</string>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -38,24 +38,26 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.7.4</string>
+	<string>1.7.9</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>1093</string>
-	<key>SecTaskAccess</key>
-	<array>
-		<string>allowed</string>
-	</array>
-	<key>SUFeedURL</key>
-	<string>http://zorg.tejat.net/bitslicer/update.php</string>
-	<key>SUEnableSystemProfiling</key>
-	<string>YES</string>
+	<string>1135</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>${MACOSX_DEPLOYMENT_TARGET}</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>SUEnableSystemProfiling</key>
+	<string>YES</string>
+	<key>SUFeedURL</key>
+	<string>https://zgcoder.net/bitslicer/update/appcast.xml</string>
+	<key>SUPublicDSAKeyFile</key>
+	<string>dsa_pub.pem</string>
+	<key>SecTaskAccess</key>
+	<array>
+		<string>allowed</string>
+	</array>
 </dict>
 </plist>

@@ -1,7 +1,5 @@
 /*
- * Created by Mayur Pawashe on 3/9/14.
- *
- * Copyright (c) 2014 zgcoder
+ * Copyright (c) 2014 Mayur Pawashe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,14 +35,18 @@
 
 @class ZGHotKey;
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface ZGHotKeyCenter : NSObject
 
 - (BOOL)registerHotKey:(ZGHotKey *)hotKey delegate:(id <ZGHotKeyDelegate>)delegate;
 
 - (BOOL)unregisterHotKey:(ZGHotKey *)hotKey;
-- (ZGHotKey *)unregisterHotKeyWithInternalID:(UInt32)internalID;
-- (NSArray *)unregisterHotKeysWithDelegate:(id <ZGHotKeyDelegate>)delegate;
+- (ZGHotKey * _Nullable)unregisterHotKeyWithInternalID:(UInt32)internalID;
+- (NSArray<ZGHotKey *> *)unregisterHotKeysWithDelegate:(id <ZGHotKeyDelegate>)delegate;
 
 - (BOOL)isRegisteredHotKey:(ZGHotKey *)hotKey;
 
 @end
+
+NS_ASSUME_NONNULL_END

@@ -1,0 +1,20 @@
+/* Filename for merged file when dumping all memory */
+"mergedFilename" = "(Все) Слитые";
+
+/* Filename for mach binary images information when dumping all memory */
+"machBinaryImagesFilename" = "Binary Images Info.txt";
+
+/* Prompt message that shows up in the save panel for choosing a folder to save memory dump files to */
+"savePanelPromptMessage" = "Выберите имя папки для сохранения файлов дампа памяти для.";
+
+/* Alert Title for when dumping all memory fails */
+"failedMemoryDumpAlertTitle" = "Ошибка дампа всей памяти";
+
+/* Alert Message for when dumping all memory fails */
+"failedMemoryDumpAlertMessage" = "Произошла ошибка при записи всей памяти на диск";
+
+/* Nofitication title for when dumping all memory finishes */
+"finishedDumpingMemoryNotificationTitle" = "Дампинг памяти завершен";
+
+/* Nofitication message format for when dumping all memory finishes */
+"finishedDumpingMemoryNotificationMessageFormat" = "Завершен дампинг всей памяти %@";
