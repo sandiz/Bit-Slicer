@@ -152,7 +152,7 @@ bool ZGRegionInfo(ZGMemoryMap processTask, ZGMemoryAddress *address, ZGMemorySiz
 	return mach_vm_region(processTask, address, size, VM_REGION_BASIC_INFO_64, (vm_region_info_t)regionInfo, &regionInfoSize, &objectName) == KERN_SUCCESS;
 }
 
-bool ZGRegionSubmapInfo(ZGMemoryMap processTask, ZGMemoryAddress *address, ZGMemorySize *size, ZGMemorySubmapInfo *regionInfo)
+bool 	ZGRegionSubmapInfo(ZGMemoryMap processTask, ZGMemoryAddress *address, ZGMemorySize *size, ZGMemorySubmapInfo *regionInfo)
 {
 	bool success = true;
 	mach_msg_type_number_t infoCount;

@@ -44,7 +44,7 @@
 	vm_region_basic_info_data_64_t info;
 	mach_msg_type_number_t infoCount;
 	mach_port_t objectName = MACH_PORT_NULL;
-	
+	int count = 0;
 	while (YES)
 	{
 		infoCount = VM_REGION_BASIC_INFO_COUNT_64;
@@ -52,10 +52,11 @@
 		{
 			break;
 		}
-		
+		//NSLog(@"Count: %d Address: %llu Size: %llu", count, address, size);
 		[regions addObject:[[ZGRegion alloc] initWithAddress:address size:size protection:info.protection]];
 		
 		address += size;
+		count ++;
 	}
 	
 	return [NSArray arrayWithArray:regions];

@@ -156,7 +156,7 @@ ZGSearchResults *ZGSearchForDataHelper(ZGMemoryMap processTask, ZGSearchData *se
 	{
 		regions = searchData.savedData.regions;
 	}
-	
+	NSLog(@"Regions Found: %lu", regions.count);
 	ZGSearchProgress *searchProgress = [[ZGSearchProgress alloc] initWithProgressType:ZGSearchProgressMemoryScanning maxProgress:regions.count];
 	
 	if (delegate != nil)
@@ -200,7 +200,6 @@ ZGSearchResults *ZGSearchForDataHelper(ZGMemoryMap processTask, ZGSearchData *se
 				if (!searchProgress.shouldCancelSearch && ZGReadBytes(processTask, address, reinterpret_cast<void **>(&bytes), &size))
 				{
 					allResultSets[regionIndex] = helper(dataIndex, address, size, bytes, regionBytes);
-					
 					ZGFreeBytes(bytes, size);
 				}
 			}
@@ -210,6 +209,17 @@ ZGSearchResults *ZGSearchForDataHelper(ZGMemoryMap processTask, ZGSearchData *se
 				dispatch_async(dispatch_get_main_queue(), ^{
 					searchProgress.numberOfVariablesFound += allResultSets[regionIndex].length / pointerSize;
 					searchProgress.progress++;
+					if(static_cast<BOOL>(allResultSets[regionIndex].length > 0))
+					   {
+					NSLog(@"Regions: %lu, Address: %llu, Size: %llu",
+						  regionIndex, address, size);
+					NSLog(@"numvar %lu", static_cast<unsigned long>(searchProgress.numberOfVariablesFound));
+						   ZGMemoryAddress regionAddress = address;
+						   ZGMemorySize regionSize = size;
+						   ZGMemorySubmapInfo submapInfo;
+						   ZGRegionSubmapInfo(processTask, &regionAddress, &regionSize, &submapInfo);
+						   NSLog(@"user_tag: %u", submapInfo.user_tag);
+					   }
 					[delegate progress:searchProgress advancedWithResultSet:allResultSets[regionIndex]];
 				});
 			}
@@ -257,6 +267,10 @@ NSData *ZGSearchWithFunctionHelperRegular(T *searchValue, F comparisonFunction, 
 		ZGMemorySize numberOfStepsToTake = MIN(addressCapacity - numberOfVariablesFound, (endLimit + dataAlignment - dataIndex) / dataAlignment);
 		for (ZGMemorySize stepIndex = 0; stepIndex < numberOfStepsToTake; stepIndex++)
 		{
+			//bool ZGIntegerEquals(ZGSearchData *__unused __unsafe_unretained searchData, T *variableValue, T *compareValue)
+			//{
+			//	return *variableValue == *compareValue;
+			//}
 			if (comparisonFunction(searchData, static_cast<T *>(static_cast<void *>(static_cast<uint8_t *>(bytes) + dataIndex)), searchValue))
 			{
 				memoryAddresses[numberOfVariablesFound] = static_cast<P>(address + dataIndex);
@@ -470,11 +484,16 @@ static NSMutableData *ZGSearchForAllPointerCandidates(ZGMemoryMap processTask, Z
 		{
 			ZGMemorySize numberOfVariablesFound = 0;
 			ZGMemoryPointerEntry memoryAddressesEntries[MAX_NUMBER_OF_STACK_ENTRIES];
-			
+			//NSLog(@"dataIndex %llu endLimit %llu ", dataIndex, endLimit);
 			ZGMemorySize numberOfStepsToTake = MIN(MAX_NUMBER_OF_STACK_ENTRIES, (endLimit + dataAlignment - dataIndex) / dataAlignment);
 			for (ZGMemorySize stepIndex = 0; stepIndex < numberOfStepsToTake; stepIndex++)
 			{
-				ZGMemoryAddress value = *(static_cast<ZGMemoryAddress *>(static_cast<void *>(static_cast<uint8_t *>(bytes) + dataIndex)));
+				if(dataIndex == endLimit) {
+					dataIndex += dataAlignment;
+					break;
+				}
+				ZGMemoryAddress *addr = (static_cast<ZGMemoryAddress *>(static_cast<void *>(static_cast<uint8_t *>(bytes) + dataIndex)));
+				ZGMemoryAddress value = *addr;
 				if (value >= minAddress && value < maxAddress)
 				{
 					ZGMemoryPointerEntry newEntry;
@@ -487,7 +506,7 @@ static NSMutableData *ZGSearchForAllPointerCandidates(ZGMemoryMap processTask, Z
 				
 				dataIndex += dataAlignment;
 			}
-			
+			//NSLog(@"region %llu numVars %llu ", address, numberOfVariablesFound);
 			[resultSet appendBytes:memoryAddressesEntries length:sizeof(ZGMemoryPointerEntry) * numberOfVariablesFound];
 		}
 	}
@@ -617,7 +636,7 @@ static std::vector<ZGRecursivePointerEntry> *ZGSearchPointersRecursively(std::un
 	return nextPointerEntries;
 }
 
-/*
+
 struct ZGPointerEntry
 {
 	ZGMemoryAddress address;
@@ -775,13 +794,12 @@ static NSData *ZGFilterStaticNodes(NSData *nodeNumberData, NSData *pointerEntryD
 	
 	delete visitedStartingNodes;
 	
-	NSLog(@"Count paths really are %u", count);
+	//NSLog(@"Count paths really are %u", count);
 	
 	return filteredNodeNumberData;
 }
  
- */
-
+ 
 static bool ZGFindMachSegment(const NSRange *staticMachSegments, const NSUInteger numberOfSegments, ZGRecursivePointerEntry &recursivePointerEntry)
 {
 	NSUInteger end = numberOfSegments;
@@ -976,7 +994,7 @@ static ZGSearchResults *ZGSearchForPointer(ZGMemoryMap processTask, ZGSearchData
 	
 	uint16_t numberOfLevels = searchData.numberOfPointerLevels;
 	
-	NSLog(@"Levels %d, searching...", numberOfLevels);
+	//NSLog(@"Levels %d, searching...", numberOfLevels);
 	
 	auto allocatedEntries = new std::unordered_map<ZGMemoryAddress, std::vector<ZGRecursivePointerEntry> *>;
 	std::unordered_map<ZGMemoryAddress, bool> encounteredEntries;
@@ -987,9 +1005,10 @@ static ZGSearchResults *ZGSearchForPointer(ZGMemoryMap processTask, ZGSearchData
 	if (recursivePointerEntries == nullptr)
 	{
 		NSLog(@"Blah.. it was null");
+		return [[ZGSearchResults alloc] initWithResultSets:@[] dataSize:dataSize pointerSize:sizeof(ZGMemoryAddress)];
 	}
 	
-	NSLog(@"Found recursive entries...");
+	//NSLog(@"Found recursive entries...");
 	
 	NSArray *machBinariesInfo = searchData.machBinariesInfo;
 	NSRange *segmentRanges = new NSRange[machBinariesInfo.count];
@@ -998,10 +1017,10 @@ static ZGSearchResults *ZGSearchForPointer(ZGMemoryMap processTask, ZGSearchData
 	for (ZGMachBinaryInfo *machBinaryInfo in machBinariesInfo)
 	{
 		segmentRanges[machBinaryInfoIndex++] = machBinaryInfo.totalSegmentRange;
-		NSLog(@"%lu: 0x%lX", machBinaryInfoIndex - 1, machBinaryInfo.totalSegmentRange.location);
+		//NSLog(@"%lu: 0x%lX", machBinaryInfoIndex - 1, machBinaryInfo.totalSegmentRange.location);
 	}
 	
-	NSLog(@"Annotating...");
+	//NSLog(@"Annotating...");
 	
 	auto staticsHashTable = new std::unordered_map<ZGMemoryAddress, int16_t>;
 	auto visitedStaticEntries = new std::unordered_map<ZGMemoryAddress, bool>;
@@ -1011,25 +1030,25 @@ static ZGSearchResults *ZGSearchForPointer(ZGMemoryMap processTask, ZGSearchData
 	delete visitedStaticEntries;
 	delete[] segmentRanges;
 	
-	NSLog(@"Pre Filtering statics...");
+	//NSLog(@"Pre Filtering statics...");
 	
 	auto hasStaticHashTable = new std::unordered_map<ZGMemoryAddress, std::vector<bool>>;
 	ZGFliterTreeForStaticInfo(hasStaticHashTable, recursivePointerEntries);
 	delete hasStaticHashTable;
 	
-	NSLog(@"Starting count...");
+	//NSLog(@"Starting count...");
 	auto countVisitors = new std::unordered_map<ZGMemoryAddress, uint64_t>;
-	NSLog(@"Plain count is %llu", ZGCountTree(recursivePointerEntries, countVisitors));
+	//NSLog(@"Plain count is %llu", ZGCountTree(recursivePointerEntries, countVisitors));
 	
 	delete countVisitors;
 	
 	auto filterCountVisitors = new std::unordered_map<ZGFilterTreeKey, uint64_t>;
-	NSLog(@"Filter Count will be %llu", ZGCountFilteredTree(recursivePointerEntries, numberOfLevels, filterCountVisitors));
+	//NSLog(@"Filter Count will be %llu", ZGCountFilteredTree(recursivePointerEntries, numberOfLevels, filterCountVisitors));
 	
 	delete filterCountVisitors;
 	
-	/*
-	NSLog(@"Serializing...");
+	
+	//NSLog(@"Serializing...");
 	NSMutableData *pointerEntryData = [[NSMutableData alloc] init];
 	NSMutableData *nodeNumberData = [[NSMutableData alloc] init];
 	
@@ -1044,17 +1063,16 @@ static ZGSearchResults *ZGSearchForPointer(ZGMemoryMap processTask, ZGSearchData
 		delete (entry.second);
 	}
 	
-	NSLog(@"Post filtering...");
+	//NSLog(@"Post filtering...");
 	NSData *reducedNodeNumberData = ZGFilterStaticNodes(nodeNumberData, pointerEntryData);
 	
-	NSLog(@"Reduced vs real count: %lu, %lu", reducedNodeNumberData.length, nodeNumberData.length);
+	//NSLog(@"Reduced vs real count: %lu, %lu", reducedNodeNumberData.length, nodeNumberData.length);
 	
 	NSLog(@"Formula..: %@", ZGAddressFormulaForPointerPath(static_cast<const uint64_t *>(reducedNodeNumberData.bytes), static_cast<const ZGPointerEntry *>(pointerEntryData.bytes)));
 	
-	NSLog(@"%lu, %lu", reducedNodeNumberData.length, pointerEntryData.length);
-	 */
+	//NSLog(@"%lu, %lu", reducedNodeNumberData.length, pointerEntryData.length);
 	
-	NSLog(@"Done..");
+	//NSLog(@"Done..");
 	
 	return [[ZGSearchResults alloc] initWithResultSets:@[] dataSize:dataSize pointerSize:sizeof(ZGMemoryAddress)];
 }

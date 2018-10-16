@@ -58,7 +58,6 @@
 		_dataAlignment = dataAlignment;
 		_pointerSize = pointerSize;
 		
-		self.searchValue = searchValue;
 		self.dataSize = dataSize;
 		self.dataAlignment = dataAlignment;
 		self.pointerSize = pointerSize;
